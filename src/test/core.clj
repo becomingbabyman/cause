@@ -1,13 +1,64 @@
 (ns test.core
   (:require
    [causal-tree.core :as c]
-   [clojure.test :refer-macro [deftest] :refer [is]]
+   [clojure.test :refer [deftest is]]
    [clojure.spec.alpha :as s]
    [clojure.spec.gen.alpha :as gen]
    [clojure.spec.test.alpha :as stest]
    [com.walmartlabs.datascope :as ds]))
 
-; (deftest)
+; TODO: move this a script that's loaded into the user ns on test start
+(require 'pjstadig.humane-test-output)
+(pjstadig.humane-test-output/activate!)
+
+(def simple-values
+  (concat [:x :x :x \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
+
+(def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
+
+(defn insert-random-node
+  ([causal-tree] (insert-random-node causal-tree (rand-nth site-ids)))
+  ([causal-tree site-id]
+   (c/insert causal-tree
+             (c/node
+              (inc (or (ffirst (last (get-in causal-tree [::c/yarns site-id]))) 0))
+              ; (inc (::c/lamport-ts causal-tree))
+              site-id
+               ; (gen/generate (s/gen ::c/value))
+               ; (char (+ (rand 52) 65))
+              (gen/generate (s/gen ::c/priority))
+              (rand-nth (keys (::c/nodes causal-tree)))
+              (rand-nth simple-values)))))
+
+(defn idempotent? [causal-tree]
+  (let [refreshed-ct (c/refresh-caches causal-tree)]
+    (is (= (::c/site-id causal-tree) (::c/site-id refreshed-ct)))
+    (is (= (::c/lamport-ts causal-tree) (::c/lamport-ts refreshed-ct)))
+    (is (= (::c/nodes causal-tree) (::c/nodes refreshed-ct)))
+    (is (= (::c/yarns causal-tree) (::c/yarns refreshed-ct)))
+    (is (= (::c/weave causal-tree) (::c/weave refreshed-ct)))))
+    ; (is (= causal-tree refreshed-ct))))
+
+; TODO: FIX: the weave was [nil n z t] on insert,
+;            but should be [nil n t z] and is after a full reweave
+(deftest simple-idempotent-insert
+  (let [nodes [[[1 "VEr5gxL9KitBN" 1] [0 "0" 0] "n"]
+               [[2 "VEr5gxL9KitBN" 1] [1 "VEr5gxL9KitBN" 1] "t"]
+               [[1 "ph86r_bp4r6dK" 1] [1 "VEr5gxL9KitBN" 1] "z"]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (is (= (::c/weave ct) (::c/weave (c/weave ct))))))
+
+(comment
+  (simple-idempotent-insert)
+  (do
+    (def tct (atom (c/new-causal-tree)))
+    (do (time (swap! tct insert-random-node)) nil)
+    (time (do (doall (repeatedly 100 #(swap! tct insert-random-node))) nil))
+    (time (clojure.pprint/pprint (c/materialize @tct)))
+    (count (::c/nodes @tct))
+    (idempotent? @tct)
+    (deref tct)
+    (clojure.pprint/pprint [(::c/weave @tct) (::c/weave (c/refresh-caches @tct))])))
 
 ; (deftest causal-tree
 ;   (insert)
@@ -16,23 +67,23 @@
 ;   (merge)
 ;   (weft))
 
-(defn spec-playground []
-  (do
-    (s/valid? ::c/lamport-ts 0)
-    (gen/generate (s/gen ::c/lamport-ts))
-    (gen/generate (s/gen ::c/basic-guid))
-    (gen/generate (s/gen ::c/id))
-    (gen/generate (s/gen ::c/site-id))
-    (gen/generate (s/gen ::c/root))
-    (gen/generate (s/gen ::c/node))
-    (gen/generate (s/gen ::c/value))
-    (gen/generate (s/gen ::c/causal-tree))
+(comment
+  (s/valid? ::c/lamport-ts 0)
+  (gen/generate (s/gen ::c/lamport-ts))
+  (gen/generate (s/gen ::c/basic-guid))
+  (gen/generate (s/gen ::c/id))
+  (gen/generate (s/gen ::c/site-id))
+  (gen/generate (s/gen ::c/root))
+  (gen/generate (s/gen ::c/node))
+  (gen/generate (s/gen ::c/value))
+  (gen/generate (s/gen ::c/priority))
+  (gen/generate (s/gen ::c/causal-tree))
 
-    (stest/instrument `c/node)
-    (stest/check `c/node)
-    (s/exercise-fn `c/node)))
+  (stest/instrument `c/node)
+  (stest/check `c/node)
+  (s/exercise-fn `c/node))
 
-(defn example-playground []
+(comment
   (do
     (def ct (atom (c/new-causal-tree)))
 

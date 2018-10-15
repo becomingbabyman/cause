@@ -135,7 +135,7 @@
   entire tree will be traversed and (re)indexed."
   ([causal-tree]
    (loop [ct1 causal-tree
-          sorted-nodes (map node (sort (::nodes causal-tree)))]
+          sorted-nodes (pmap node (sort (::nodes causal-tree)))]
      (if (empty? sorted-nodes)
        ct1
        (recur (spin ct1 (first sorted-nodes))
@@ -181,7 +181,7 @@
   If a node is passed only that node will be woven in O(n)."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::weave [])
-           (map node (sort (::nodes causal-tree)))))
+           (pmap node (sort (::nodes causal-tree)))))
   ([causal-tree node]
    (if (not (get-in causal-tree [::nodes (first node)]))
      causal-tree
@@ -287,6 +287,6 @@
                (first more-ids) (rest more-ids))
         (-> new-ct
             (assoc ::site-id (::site-id causal-tree))
-            (assoc ::lamport-ts (apply max (map first filtered-ids)))
+            (assoc ::lamport-ts (apply max (pmap first filtered-ids)))
             (yarns->nodes)
             (weave))))))
