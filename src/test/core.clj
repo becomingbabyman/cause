@@ -1,6 +1,7 @@
 (ns test.core
   (:require
    [causal-tree.core :as c]
+   [clojure.pprint :refer [pprint]]
    [clojure.test :refer [deftest is]]
    [clojure.spec.alpha :as s]
    [clojure.spec.gen.alpha :as gen]
@@ -16,19 +17,22 @@
 
 (def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
 
-(defn insert-random-node
-  ([causal-tree] (insert-random-node causal-tree (rand-nth site-ids)))
+(defn rand-node
+  ([causal-tree] (rand-node causal-tree (rand-nth site-ids)))
   ([causal-tree site-id]
-   (c/insert causal-tree
-             (c/node
-              (inc (or (ffirst (last (get-in causal-tree [::c/yarns site-id]))) 0))
-              ; (inc (::c/lamport-ts causal-tree))
-              site-id
-               ; (gen/generate (s/gen ::c/value))
-               ; (char (+ (rand 52) 65))
-              (gen/generate (s/gen ::c/priority))
-              (rand-nth (keys (::c/nodes causal-tree)))
-              (rand-nth simple-values)))))
+   (c/node
+    ; (inc (::c/lamport-ts causal-tree))
+    (inc (or (ffirst (last (get-in causal-tree [::c/yarns site-id]))) 0))
+    site-id
+    (gen/generate (s/gen ::c/priority))
+    (rand-nth (keys (::c/nodes causal-tree)))
+     ; (char (+ (rand 52) 65))
+     ; (gen/generate (s/gen ::c/value))
+    (rand-nth simple-values))))
+
+(defn insert-rand-node
+  ([causal-tree] (insert-rand-node causal-tree (rand-node causal-tree)))
+  ([causal-tree node] (c/insert causal-tree node)))
 
 (defn idempotent? [causal-tree]
   (let [refreshed-ct (c/refresh-caches causal-tree)]
@@ -46,14 +50,28 @@
                [[2 "VEr5gxL9KitBN" 1] [1 "VEr5gxL9KitBN" 1] "t"]
                [[1 "ph86r_bp4r6dK" 1] [1 "VEr5gxL9KitBN" 1] "z"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
-    (is (= (::c/weave ct) (::c/weave (c/weave ct))))))
+    (idempotent? ct)))
+
+(deftest iterative-idempotent-weave-one-node-vs-all
+  (loop [ct (c/new-causal-tree)
+         last-node (last (::c/weave ct))
+         step 0]
+    (if (and (< step 99)
+             (is (= (::c/weave ct) (::c/weave (c/weave ct)))))
+      (let [node (rand-node ct)]
+        (recur (c/insert ct node) node (inc step)))
+      (pprint {:step step
+               :last-node last-node
+               :initial (c/materialize ct)
+               :reweave (c/materialize (c/weave ct))}))))
 
 (comment
   (simple-idempotent-insert)
+  (iterative-idempotent-weave-one-node-vs-all)
   (do
     (def tct (atom (c/new-causal-tree)))
-    (do (time (swap! tct insert-random-node)) nil)
-    (time (do (doall (repeatedly 100 #(swap! tct insert-random-node))) nil))
+    (do (time (swap! tct insert-rand-node)) nil)
+    (time (do (doall (repeatedly 100 #(swap! tct insert-rand-node))) nil))
     (time (clojure.pprint/pprint (c/materialize @tct)))
     (count (::c/nodes @tct))
     (idempotent? @tct)
@@ -143,7 +161,8 @@
       (def n12a (c/node 19 sa 0 (first n11a) \t))
       ; "s love dogs"
       (def sb (c/guid))
-      (def n1b (c/node 8 sb 0 (first (nth (reverse (::c/weave @ct)) 2)) \s))
+      ; (def n1b (c/node 8 sb 0 (first (nth (reverse (::c/weave @ct)) 2)) \s))
+      (def n1b (c/node 8 sb 0 (second n1a) \s))
       (def n2b (c/node 9 sb 0 (first n1b) (first " ")))
       (def n3b (c/node 10 sb 0 (first n2b) \l))
       (def n4b (c/node 11 sb 0 (first n3b) \o))
@@ -178,6 +197,7 @@
       (swap! ct c/insert n10b)
       (swap! ct c/insert n11b))
 
+    (c/materialize @ct)
     (c/materialize (c/weave @ct))
     ; (swap! ct weave)
     ; (ds/view (::weave @ct))
