@@ -30,7 +30,6 @@
          value (rand-nth simple-values)]
              ; (char (+ (rand 52) 65))
              ; (gen/generate (s/gen ::c/value))]
-     (println cause lamport-ts)
      (c/node lamport-ts site-id 0 cause value))))
 
 (defn insert-rand-node
@@ -47,45 +46,67 @@
     ; (is (= causal-tree refreshed-ct))))
 
 (deftest known-idempotent-insert-edge-cases
-  (let [nodes [[[0 "0" 0] nil nil]
-               [[1 "xT_odlTBwTRNU" 0] [0 "0" 0] :x]
+  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] :x]
                [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \d]
                [[3 "9FyYzf9pum6E4" 0] [0 "0" 0] \r]
                [[4 "NwudSBdQg3Ru2" 0] [3 "9FyYzf9pum6E4" 0] \space]
                [[4 "9FyYzf9pum6E4" 0] [0 "0" 0] \d]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[0 "0" 0] nil nil]
-               [[1 "xT_odlTBwTRNU" 0] [0 "0" 0] \space]
+  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] \space]
                [[2 "xT_odlTBwTRNU" 0] [0 "0" 0] \b]
                [[2 "NwudSBdQg3Ru2" 0] [1 "xT_odlTBwTRNU" 0] \q]
                [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \space]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[0 "0" 0] nil nil]
-               [[1 "Pz8iuNCXvVsYN" 0] [0 "0" 0] \o]
+  (let [nodes [[[1 "Pz8iuNCXvVsYN" 0] [0 "0" 0] \o]
                [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] :x]
                [[3 "9FyYzf9pum6E4" 0] [2 "Pz8iuNCXvVsYN" 0] \u]
                [[2 "NwudSBdQg3Ru2" 0] [1 "Pz8iuNCXvVsYN" 0] \space]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \j]
+               [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \w]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] :x]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \u]
+               [[2 "W7XhooU1Hsw7E" 0] [1 "W7XhooU1Hsw7E" 0] \space]
+               [[2 "7hLbMKLvcll_4" 0] [1 "W7XhooU1Hsw7E" 0] :x]
+               [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \m]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[1 "Ftbpo0oG7ZnpR" 0] [0 "0" 0] :x]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] :x]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] :x]
+               [[2 "A~iIXinAXkGX7" 0] [1 "VdIJLRISw~zgo" 0] "j"]
+               [[3 "A~iIXinAXkGX7" 0] [0 "0" 0] "i"]
+               [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] "s"]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct)))
 
-(deftest iterative-idempotent-weave-one-node-vs-all
-  (loop [ct (c/new-causal-tree)
-         insertions (::c/weave ct)
-         step 0]
-    (if (and (< step 99)
-             (is (= (::c/weave ct) (::c/weave (c/weave ct)))))
-      (let [node (rand-node ct)]
-        (recur (c/insert ct node) (conj insertions node) (inc step)))
-      (pprint {:step step
-               :insertions insertions
-               :initial (c/materialize ct)
-               :reweave (c/materialize (c/weave ct))}))))
+(defn find-weave-inconsistencies
+  ([] (find-weave-inconsistencies 9))
+  ([max-steps]
+   (loop [ct (c/new-causal-tree)
+          insertions (::c/weave ct)
+          step 0]
+     (if (>= step max-steps)
+       nil
+       (if (is (= (::c/weave ct) (::c/weave (c/weave ct))))
+         (let [node (rand-node ct)]
+           (recur (c/insert ct node) (conj insertions node) (inc step)))
+         {:insertions insertions
+          :step step
+          :initial (c/materialize ct)
+          :reweave (c/materialize (c/weave ct))})))))
 
 (comment
   (known-idempotent-insert-edge-cases)
-  (iterative-idempotent-weave-one-node-vs-all)
+  (keep (fn [_] (find-weave-inconsistencies 5))
+        (range 999))
   (do
     (def tct (atom (c/new-causal-tree)))
     (do (time (swap! tct insert-rand-node)) nil)

@@ -161,30 +161,30 @@
   node must be inserted after the left or ASAP."
   [nl nm nr]
   (or
-    ; Always try to weave a node after its cause.
-    ; This is especially important for deletes.
-   (= (first nl) (second nm))
-    ; Always try to weave a node before a node it causes.
-   (= (first nm) (second nr))))
+   (= (first nl) (second nm)) ; Always try to weave a node after its cause.
+   (= (first nm) (second nr)))) ; Always try to weave a node before a node it causes.
 
 (defn dont-weave?
   "Takes a left, a middle and a right node. Returns true if the middle
   node cannot be inserted between the left and the right for any reason."
-  [nl nm nr asap]
+  [nl nm nr]
   (or
-   (and ; don't weave between a delete and the node it deletes
-    (= :x (last nr))
-    (not= (first nm) (second nr))) ; unless nm is the node it deletes ;)
-   ; (and ; don't break up adjacent runs or highest to lowest
-   ;  asap
-   ;  (= (second nm) (second nr))
-   ;  (<< (first nr) (first nm)))))
-   ; (and
-   ;  (= (first nl) (second nr))
-   ;  (<< (first nm) (first nr)))))
-   (and asap
-        (= (second nm) (second nr)) ; if two nodes share a cause
-        (<< (first nm) (first nr))))) ; make sure the newer one stays first
+   (and
+    (= :x (last nr)) ; if the next node is a delete
+    (not= (first nm) (second nr)) ; and it does not delete this node, don't weave
+    (or (not= :x (last nm)) ; and this node is not also a delete
+        (<< (first nm) (first nr)))) ; or if it is, it is older, don't weave.
+   (and
+    (or (= (first nl) (second nr)) ; if the next node is caused by the previous node
+        (= (second nl) (second nr))) ; if the next node is caused by the previous node
+    (<< (first nm) (first nr)) ; and this node is older
+    (or (not= :x (last nm)) ; and this node is not a delete
+        (= :x (last nr)))) ; or the next node is a delete, don't weave.
+   (and
+    (= (second nm) (second nr)) ; if this node and the next node are caused by the same node
+    (<< (first nm) (first nr)) ; and this node is older
+    (or (not= :x (last nm)) ; and this node is not a delete
+        (= :x (last nr)))))) ; or the next node is a delete, don't weave.
 
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
@@ -202,8 +202,7 @@
              nr (first right)
              asap (or prev-asap (weave-asap? nl node nr))]
          (if (or (empty? right)
-                 (and (not (dont-weave? nl node nr asap))
-                      (or asap))) ; (<< (first nl) (first node) (first nr)))))
+                 (and asap (not (dont-weave? nl node nr))))
            (assoc causal-tree ::weave (vec (concat left [node] right)))
            (recur (conj left nr) (rest right) asap)))))))
 
@@ -253,10 +252,10 @@
         (reduce str)))
   ([causal-tree [nl nm nr]]
    (cond
-     (= :x (last nm)) nil
-     (and (= :x (last nr))
-          (= (first nm) (second nr))) nil
-     :else (last nm))))
+     (= :x (last nm)) nil ; Don't return deletes.
+     (and (= :x (last nr)) ; If the next node is a delete
+          (= (first nm) (second nr))) nil ; and it deletes this node, return nil
+     :else (last nm)))) ; Return the value.
 
 (defn refresh-caches
   "Replaces everything but ::nodes and ::site-id with refreshed caches
