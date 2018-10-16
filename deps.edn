@@ -7,7 +7,8 @@
         nano-id {:mvn/version "0.9.3"}}
  :aliases
  {:dev {:extra-deps {walmartlabs/datascope {:mvn/version "0.1.1"}
-                     criterium {:mvn/version "0.4.4"}}}
+                     criterium {:mvn/version "0.4.4"}
+                     com.taoensso/tufte {:mvn/version "2.0.1"}}}
 
   ;; pull in specific versions of Clojure:
   :1.2 {:override-deps {org.clojure/clojure {:mvn/version "1.2.1"}}}
