@@ -6,6 +6,7 @@
    [clojure.spec.alpha :as s]
    [clojure.spec.gen.alpha :as gen]
    [clojure.spec.test.alpha :as stest]
+   [criterium.core :refer [quick-bench]]
    [com.walmartlabs.datascope :as ds]))
 
 ; TODO: move this a script that's loaded into the user ns on test start
@@ -20,15 +21,17 @@
 (defn rand-node
   ([causal-tree] (rand-node causal-tree (rand-nth site-ids)))
   ([causal-tree site-id]
-   (c/node
-    ; (inc (::c/lamport-ts causal-tree))
-    (inc (or (ffirst (last (get-in causal-tree [::c/yarns site-id]))) 0))
-    site-id
-    (gen/generate (s/gen ::c/priority))
-    (rand-nth (keys (::c/nodes causal-tree)))
-     ; (char (+ (rand 52) 65))
-     ; (gen/generate (s/gen ::c/value))
-    (rand-nth simple-values))))
+   (let [cause (rand-nth (keys (::c/nodes causal-tree)))
+         lamport-ts (inc (max
+                          (first cause)
+                          (or (ffirst (last (get-in causal-tree
+                                                    [::c/yarns site-id])))
+                              0)))
+         value (rand-nth simple-values)]
+             ; (char (+ (rand 52) 65))
+             ; (gen/generate (s/gen ::c/value))]
+     (println cause lamport-ts)
+     (c/node lamport-ts site-id 0 cause value))))
 
 (defn insert-rand-node
   ([causal-tree] (insert-rand-node causal-tree (rand-node causal-tree)))
@@ -43,40 +46,57 @@
     (is (= (::c/weave causal-tree) (::c/weave refreshed-ct)))))
     ; (is (= causal-tree refreshed-ct))))
 
-; TODO: FIX: the weave was [nil n z t] on insert,
-;            but should be [nil n t z] and is after a full reweave
-(deftest simple-idempotent-insert
-  (let [nodes [[[1 "VEr5gxL9KitBN" 1] [0 "0" 0] "n"]
-               [[2 "VEr5gxL9KitBN" 1] [1 "VEr5gxL9KitBN" 1] "t"]
-               [[1 "ph86r_bp4r6dK" 1] [1 "VEr5gxL9KitBN" 1] "z"]]
+(deftest known-idempotent-insert-edge-cases
+  (let [nodes [[[0 "0" 0] nil nil]
+               [[1 "xT_odlTBwTRNU" 0] [0 "0" 0] :x]
+               [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \d]
+               [[3 "9FyYzf9pum6E4" 0] [0 "0" 0] \r]
+               [[4 "NwudSBdQg3Ru2" 0] [3 "9FyYzf9pum6E4" 0] \space]
+               [[4 "9FyYzf9pum6E4" 0] [0 "0" 0] \d]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[0 "0" 0] nil nil]
+               [[1 "xT_odlTBwTRNU" 0] [0 "0" 0] \space]
+               [[2 "xT_odlTBwTRNU" 0] [0 "0" 0] \b]
+               [[2 "NwudSBdQg3Ru2" 0] [1 "xT_odlTBwTRNU" 0] \q]
+               [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \space]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[0 "0" 0] nil nil]
+               [[1 "Pz8iuNCXvVsYN" 0] [0 "0" 0] \o]
+               [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] :x]
+               [[3 "9FyYzf9pum6E4" 0] [2 "Pz8iuNCXvVsYN" 0] \u]
+               [[2 "NwudSBdQg3Ru2" 0] [1 "Pz8iuNCXvVsYN" 0] \space]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct)))
 
 (deftest iterative-idempotent-weave-one-node-vs-all
   (loop [ct (c/new-causal-tree)
-         last-node (last (::c/weave ct))
+         insertions (::c/weave ct)
          step 0]
     (if (and (< step 99)
              (is (= (::c/weave ct) (::c/weave (c/weave ct)))))
       (let [node (rand-node ct)]
-        (recur (c/insert ct node) node (inc step)))
+        (recur (c/insert ct node) (conj insertions node) (inc step)))
       (pprint {:step step
-               :last-node last-node
+               :insertions insertions
                :initial (c/materialize ct)
                :reweave (c/materialize (c/weave ct))}))))
 
 (comment
-  (simple-idempotent-insert)
+  (known-idempotent-insert-edge-cases)
   (iterative-idempotent-weave-one-node-vs-all)
   (do
     (def tct (atom (c/new-causal-tree)))
     (do (time (swap! tct insert-rand-node)) nil)
-    (time (do (doall (repeatedly 100 #(swap! tct insert-rand-node))) nil))
+    (time (do (doall (repeatedly 50 #(swap! tct insert-rand-node))) nil))
     (time (clojure.pprint/pprint (c/materialize @tct)))
     (count (::c/nodes @tct))
     (idempotent? @tct)
     (deref tct)
-    (clojure.pprint/pprint [(::c/weave @tct) (::c/weave (c/refresh-caches @tct))])))
+    (clojure.pprint/pprint [(::c/weave @tct) (::c/weave (c/refresh-caches @tct))]))
+  (quick-bench (do (doall (repeatedly 10000 #(insert-rand-node @tct))) nil))
+  (quick-bench (do (c/materialize @tct) nil)))
 
 ; (deftest causal-tree
 ;   (insert)

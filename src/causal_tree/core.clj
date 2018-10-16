@@ -170,11 +170,21 @@
 (defn dont-weave?
   "Takes a left, a middle and a right node. Returns true if the middle
   node cannot be inserted between the left and the right for any reason."
-  [nl nm nr]
+  [nl nm nr asap]
   (or
    (and ; don't weave between a delete and the node it deletes
     (= :x (last nr))
-    (not= (first nm) (second nr))))) ; unless nm is the node it deletes ;)
+    (not= (first nm) (second nr))) ; unless nm is the node it deletes ;)
+   ; (and ; don't break up adjacent runs or highest to lowest
+   ;  asap
+   ;  (= (second nm) (second nr))
+   ;  (<< (first nr) (first nm)))))
+   ; (and
+   ;  (= (first nl) (second nr))
+   ;  (<< (first nm) (first nr)))))
+   (and asap
+        (= (second nm) (second nr)) ; if two nodes share a cause
+        (<< (first nm) (first nr))))) ; make sure the newer one stays first
 
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
@@ -192,8 +202,8 @@
              nr (first right)
              asap (or prev-asap (weave-asap? nl node nr))]
          (if (or (empty? right)
-                 (and (not (dont-weave? nl node nr))
-                      (or asap (<< (first nl) (first node) (first nr)))))
+                 (and (not (dont-weave? nl node nr asap))
+                      (or asap))) ; (<< (first nl) (first node) (first nr)))))
            (assoc causal-tree ::weave (vec (concat left [node] right)))
            (recur (conj left nr) (rest right) asap)))))))
 
