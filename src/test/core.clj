@@ -2,6 +2,7 @@
   (:require
    [causal-tree.core :as c]
    [clojure.pprint :refer [pprint]]
+   [clojure.string :as string]
    [clojure.test :refer [deftest is]]
    [clojure.spec.alpha :as s]
    [clojure.spec.gen.alpha :as gen]
@@ -16,21 +17,22 @@
 (def simple-values
   (concat [:x :x :x \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
-(def site-ids [" a " " f " " z "])
+(def site-ids [0 1 2])
 ; (def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
 
 (defn rand-node
   ([causal-tree] (rand-node causal-tree (rand-nth site-ids)))
-  ([causal-tree site-id]
+  ([causal-tree site-id] (rand-node causal-tree site-id
+                                    (rand-nth simple-values)))
+                                    ; (char (+ (rand 52) 65))
+                                    ; (gen/generate (s/gen ::c/value))
+  ([causal-tree site-id value]
    (let [cause (rand-nth (keys (::c/nodes causal-tree)))
          lamport-ts (inc (max
                           (first cause)
                           (or (ffirst (last (get-in causal-tree
                                                     [::c/yarns site-id])))
-                              0)))
-         value (rand-nth simple-values)]
-             ; (char (+ (rand 52) 65))
-             ; (gen/generate (s/gen ::c/value))]
+                              0)))]
      (c/node lamport-ts site-id 0 cause value))))
 
 (defn insert-rand-node
@@ -118,8 +120,70 @@
 
 (comment
   (known-idempotent-insert-edge-cases)
-  (keep (fn [_] (find-weave-inconsistencies 9))
-        (range 999))
+  (keep (fn [_] (find-weave-inconsistencies 99))
+        (range 99)))
+
+(def prose (string/split "Hereupon Legrand arose, with a grave and stately air, and brought me the beetle
+from a glass case in which it was enclosed. It was a beautiful scarabaeus, and, at
+that time, unknown to naturalists—of course a great prize in a scientific point
+of view. There were two round black spots near one extremity of the back, and a
+long one near the other. The scales were exceedingly hard and glossy, with all the
+appearance of burnished gold. The weight of the insect was very remarkable, and,
+taking all things into consideration, I could hardly blame Jupiter for his opinion
+respecting it." #" "))
+
+(defn rand-phrase []
+  (let [t (+ 2 (rand-int 6))
+        d (- (rand-int (count prose)) t)]
+    (string/join " " (take t (drop d prose)))))
+
+(defn rand-weave-of-phrases
+  ([] (rand-weave-of-phrases 3))
+  ([n-phrases]
+   (let [starting-phrases (map #(str " <" % "> ") (repeatedly n-phrases rand-phrase))]
+     (loop [ct (c/new-causal-tree)
+            insertions []
+            phrase (first starting-phrases)
+            phrases (rest starting-phrases)
+            site-id (c/guid)]
+       (if (not-empty phrase)
+         (let [cause (last (get-in ct [::c/yarns site-id]))
+               node  (c/node (inc (or (ffirst cause) 1)) site-id 0
+                             (or (first cause) c/root-id) (first phrase))]
+               ; (rand-node ct site-id (first phrase))]
+           (recur (c/insert ct node)
+                  (conj insertions node)
+                  (if (not-empty (rest phrase)) (rest phrase) (first phrases))
+                  (if (not-empty (rest phrase)) phrases (rest phrases))
+                  (if (not-empty (rest phrase)) site-id (c/guid))))
+         (do
+           ; (pprint insertions)
+           ; (println "------------------------")
+           ; (println "------------------------")
+           ; (println "------------------------")
+           ; (pprint (::c/weave ct))
+           {:phrases starting-phrases
+            :materialized-weave (c/materialize ct)
+            :materialized-reweave (c/materialize (c/weave ct))}))))))
+
+(deftest concurrent-runs-stick-together
+  (let [result (rand-weave-of-phrases 5)]
+    (doall (map #(is (string/includes? (:materialized-weave result) %))
+                (:phrases result)))))
+
+(comment
+  (rand-phrase)
+  (rand-weave-of-phrases 3)
+  (concurrent-runs-stick-together))
+
+; (deftest causal-tree
+;   (insert)
+;   (append)
+;   (weave)
+;   (merge)
+;   (weft))
+
+(comment
   (do
     (def tct (atom (c/new-causal-tree)))
     (do (time (swap! tct insert-rand-node)) nil)
@@ -131,13 +195,6 @@
     (clojure.pprint/pprint [(::c/weave @tct) (::c/weave (c/refresh-caches @tct))]))
   (quick-bench (do (doall (repeatedly 10000 #(insert-rand-node @tct))) nil))
   (quick-bench (do (c/materialize @tct) nil)))
-
-; (deftest causal-tree
-;   (insert)
-;   (append)
-;   (weave)
-;   (merge)
-;   (weft))
 
 (comment
   (s/valid? ::c/lamport-ts 0)

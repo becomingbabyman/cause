@@ -158,7 +158,7 @@
 
 (defn weave-asap?
   "Takes a left, a middle and a right node. Returns true if the middle
-  node must be inserted after the left or ASAP."
+  node should be inserted as soon as possible."
   [nl nm nr]
   (or
    (= (first nl) (second nm)) ; Always try to weave a node after its cause.
