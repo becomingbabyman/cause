@@ -183,9 +183,9 @@
     (or (not= :x (last nm)) ; and this node is not a delete
         (= :x (last nr)))) ; or the next node is a delete, don't weave.
    (and
-    (or (= (second nm) (second nr)) ; if this node and the next node are caused by the same node
-        (and (not= (first nl) (second nr)) ; the next node is not part of a run
-             (not= (first nl) (second nm)))) ; and this node is not part of a run
+    ; (or (= (second nm) (second nr)) ; if this node and the next node are caused by the same node
+    ;     (and (not= (first nl) (second nr)) ; the next node is not part of a run
+    ;          (not= (first nl) (second nm)))) ; and this node is not part of a run
     (<< (first nm) (first nr)) ; and this node is older
     (or (not= :x (last nm)) ; and this node is not a delete
         (= :x (last nr)))))) ; or the next node is a delete, don't weave.
