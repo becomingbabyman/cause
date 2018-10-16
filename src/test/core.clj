@@ -16,7 +16,8 @@
 (def simple-values
   (concat [:x :x :x \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
-(def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
+(def site-ids [" a " " f " " z "])
+; (def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
 
 (defn rand-node
   ([causal-tree] (rand-node causal-tree (rand-nth site-ids)))
@@ -86,10 +87,16 @@
                [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] "s"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] :x]
-               [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] :x]
-               [[2 "W7XhooU1Hsw7E" 0] [1 "W7XhooU1Hsw7E" 0] "o"]
-               [[2 "A~iIXinAXkGX7" 0] [1 "VdIJLRISw~zgo" 0] "u"]]
+  (let [nodes [[[1 " f " 0] [0 "0" 0] :x]
+               [[2 " z " 0] [1 " f " 0] " "]
+               [[2 " f " 0] [0 "0" 0] "l"]
+               [[2 " a " 0] [1 " f " 0] "v"]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[1 " f " 0] [0 "0" 0] :x]
+               [[2 " f " 0] [0 "0" 0] :x]
+               [[3 " a " 0] [2 " f " 0] "c"]
+               [[2 " z " 0] [1 " f " 0] "r"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct)))
 
@@ -111,7 +118,7 @@
 
 (comment
   (known-idempotent-insert-edge-cases)
-  (keep (fn [_] (find-weave-inconsistencies 5))
+  (keep (fn [_] (find-weave-inconsistencies 9))
         (range 999))
   (do
     (def tct (atom (c/new-causal-tree)))

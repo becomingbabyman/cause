@@ -183,7 +183,9 @@
     (or (not= :x (last nm)) ; and this node is not a delete
         (= :x (last nr)))) ; or the next node is a delete, don't weave.
    (and
-    (= (second nm) (second nr)) ; if this node and the next node are caused by the same node
+    (or (= (second nm) (second nr)) ; if this node and the next node are caused by the same node
+        (and (not= (first nl) (second nr)) ; the next node is not part of a run
+             (not= (first nl) (second nm)))) ; and this node is not part of a run
     (<< (first nm) (first nr)) ; and this node is older
     (or (not= :x (last nm)) ; and this node is not a delete
         (= :x (last nr)))))) ; or the next node is a delete, don't weave.
@@ -200,17 +202,17 @@
      (loop [left []
             right (::weave causal-tree)
             prev-asap false
-            prev-seen-since-asap {}]
+            seen-since-asap {}]
        (let [nl (last left)
              nr (first right)
-             asap (or prev-asap (weave-asap? nl node nr))
-             seen prev-seen-since-asap]
+             asap (or prev-asap (weave-asap? nl node nr))]
          (if (or (empty? right)
-                 (and asap (not (weave-later? nl node nr seen))))
+                 (and asap (not (weave-later? nl node nr seen-since-asap))))
            (assoc causal-tree ::weave (vec (concat left [node] right)))
            (recur (conj left nr) (rest right) asap (if asap
-                                                     (assoc seen (first nl) true)
-                                                     seen))))))))
+                                                     (assoc seen-since-asap
+                                                            (first nl) true)
+                                                     seen-since-asap))))))))
 
 (defn insert
   "Inserts an arbitrary node from any site and any point in time. If the
