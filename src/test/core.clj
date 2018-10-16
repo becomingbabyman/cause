@@ -85,6 +85,12 @@
                [[3 "A~iIXinAXkGX7" 0] [0 "0" 0] "i"]
                [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] "s"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
+    (idempotent? ct))
+  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] :x]
+               [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] :x]
+               [[2 "W7XhooU1Hsw7E" 0] [1 "W7XhooU1Hsw7E" 0] "o"]
+               [[2 "A~iIXinAXkGX7" 0] [1 "VdIJLRISw~zgo" 0] "u"]]
+        ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct)))
 
 (defn find-weave-inconsistencies

@@ -164,10 +164,11 @@
    (= (first nl) (second nm)) ; Always try to weave a node after its cause.
    (= (first nm) (second nr)))) ; Always try to weave a node before a node it causes.
 
-(defn dont-weave?
+(defn weave-later?
   "Takes a left, a middle and a right node. Returns true if the middle
-  node cannot be inserted between the left and the right for any reason."
-  [nl nm nr]
+  node cannot be inserted between the left and the right for any reason.
+  This assumes that you already want to weave-asap?."
+  [nl nm nr seen]
   (or
    (and
     (= :x (last nr)) ; if the next node is a delete
@@ -176,7 +177,8 @@
         (<< (first nm) (first nr)))) ; or if it is, it is older, don't weave.
    (and
     (or (= (first nl) (second nr)) ; if the next node is caused by the previous node
-        (= (second nl) (second nr))) ; if the next node is caused by the previous node
+        (= (second nl) (second nr)) ; or if the next node shares a cause with the previous node
+        (get seen (second nr))) ; or the next node is caused by a seen node
     (<< (first nm) (first nr)) ; and this node is older
     (or (not= :x (last nm)) ; and this node is not a delete
         (= :x (last nr)))) ; or the next node is a delete, don't weave.
@@ -197,14 +199,18 @@
      causal-tree
      (loop [left []
             right (::weave causal-tree)
-            prev-asap false]
+            prev-asap false
+            prev-seen-since-asap {}]
        (let [nl (last left)
              nr (first right)
-             asap (or prev-asap (weave-asap? nl node nr))]
+             asap (or prev-asap (weave-asap? nl node nr))
+             seen prev-seen-since-asap]
          (if (or (empty? right)
-                 (and asap (not (dont-weave? nl node nr))))
+                 (and asap (not (weave-later? nl node nr seen))))
            (assoc causal-tree ::weave (vec (concat left [node] right)))
-           (recur (conj left nr) (rest right) asap)))))))
+           (recur (conj left nr) (rest right) asap (if asap
+                                                     (assoc seen (first nl) true)
+                                                     seen))))))))
 
 (defn insert
   "Inserts an arbitrary node from any site and any point in time. If the
