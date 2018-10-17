@@ -245,11 +245,7 @@
         node (node (::lamport-ts ct2) (::site-id ct2) priority cause value)]
     (insert ct2 node)))
 
-(defn merge-trees
-  "Merges two causal-trees"
-  [causal-tree1 causal-tree2]
-  (println "TODO"))
-
+; TODO: rename to ct->edn
 (defn materialize
   "Returns the current state of the tree as edn. E.g. a tree of chars
   will materialize as a string."
@@ -307,3 +303,15 @@
             (assoc ::lamport-ts (apply max (pmap first filtered-ids)))
             (yarns->nodes)
             (weave))))))
+
+; TODO: should this take whole trees or a tree and nodes?
+;   Nodes are simpler, can be sorted, and merged in with O(n*m)
+;   m being the number of nodes in the merge. It's likely that
+;   there will be duplicate nodes either way, so a diff will
+;   always need to be calculated...
+(defn merge-trees
+  "Merges two or more causal-trees into one."
+  ([causal-tree1 causal-tree2 & more]
+   (apply merge-trees (merge-trees causal-tree1 causal-tree2) more))
+  ([causal-tree1 causal-tree2]
+   (println "TODO")))
