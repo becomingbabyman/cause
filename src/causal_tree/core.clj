@@ -18,7 +18,7 @@
 
 (def site-id-length 13)
 (def speical-keywords #{::delete})
-(def root-id [0 "0" 0])
+(def root-id [0 "0"])
 (def root-node [root-id nil nil])
 
 (defn gen-string [length]
@@ -26,13 +26,12 @@
 
 (s/def ::lamport-ts nat-int?) ; AKA the index in a yarn
 ; TODO: should a wall-clock-ts be added? If a central Datomic DB is used then nodes will get a wall clock ts based on when they were synced to the server...
-(s/def ::priority #{0 1}) ; TODO: is this even needed? The idea is to use it to help with operations like delete, but it's unclear if that op will pose a challenge without this.
 (s/def ::basic-guid (s/with-gen (s/and string? #(or
                                                  (= (count %) site-id-length)
                                                  (= % "0")))
                                 #(gen-string site-id-length)))
 (s/def ::site-id ::basic-guid)
-(s/def ::id (s/tuple ::lamport-ts ::site-id ::priority))
+(s/def ::id (s/tuple ::lamport-ts ::site-id))
 (s/def ::cause ::id)
 (s/def ::value (s/or :c char? :special-k speical-keywords)) ; TODO: start with text and expand to support more value types later.
 
@@ -79,8 +78,8 @@
 (defn node
   ([[k v :as node-kv-tuple]] ; maps the keys / values in the ::nodes map back to nodes
    (into [k] v))
-  ([lamport-ts site-id priority cause value]
-   [[lamport-ts site-id priority]
+  ([lamport-ts site-id cause value]
+   [[lamport-ts site-id]
     cause
     value]))
 (s/fdef node
@@ -89,7 +88,6 @@
                :arity-5 (s/and
                          (s/cat :lamport-ts ::lamport-ts
                                 :site-id ::site-id
-                                :priority ::priority
                                 :cause ::cause
                                 :value ::value)
                          #(> (:lamport-ts %) (first (:cause %))))) ; node ts must be more than cause ts
@@ -240,9 +238,9 @@
 (defn append
   "Similar to insert, but automatically calculates node id based on the
   local site-id and lamport-ts."
-  [causal-tree value cause priority]
+  [causal-tree value cause]
   (let [ct2 (update-in causal-tree [::lamport-ts] inc)
-        node (node (::lamport-ts ct2) (::site-id ct2) priority cause value)]
+        node (node (::lamport-ts ct2) (::site-id ct2) cause value)]
     (insert ct2 node)))
 
 ; TODO: rename to ct->edn

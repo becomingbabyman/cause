@@ -33,7 +33,7 @@
                           (or (ffirst (last (get-in causal-tree
                                                     [::c/yarns site-id])))
                               0)))]
-     (c/node lamport-ts site-id 0 cause value))))
+     (c/node lamport-ts site-id cause value))))
 
 (defn insert-rand-node
   ([causal-tree] (insert-rand-node causal-tree (rand-node causal-tree)))
@@ -49,56 +49,56 @@
     ; (is (= causal-tree refreshed-ct))))
 
 (deftest known-idempotent-insert-edge-cases
-  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] ::c/delete]
-               [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \d]
-               [[3 "9FyYzf9pum6E4" 0] [0 "0" 0] \r]
-               [[4 "NwudSBdQg3Ru2" 0] [3 "9FyYzf9pum6E4" 0] \space]
-               [[4 "9FyYzf9pum6E4" 0] [0 "0" 0] \d]]
+  (let [nodes [[[1 "xT_odlTBwTRNU"] [0 "0"] ::c/delete]
+               [[2 "9FyYzf9pum6E4"] [1 "xT_odlTBwTRNU"] \d]
+               [[3 "9FyYzf9pum6E4"] [0 "0"] \r]
+               [[4 "NwudSBdQg3Ru2"] [3 "9FyYzf9pum6E4"] \space]
+               [[4 "9FyYzf9pum6E4"] [0 "0"] \d]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] \space]
-               [[2 "xT_odlTBwTRNU" 0] [0 "0" 0] \b]
-               [[2 "NwudSBdQg3Ru2" 0] [1 "xT_odlTBwTRNU" 0] \q]
-               [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \space]]
+  (let [nodes [[[1 "xT_odlTBwTRNU"] [0 "0"] \space]
+               [[2 "xT_odlTBwTRNU"] [0 "0"] \b]
+               [[2 "NwudSBdQg3Ru2"] [1 "xT_odlTBwTRNU"] \q]
+               [[2 "9FyYzf9pum6E4"] [1 "xT_odlTBwTRNU"] \space]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "Pz8iuNCXvVsYN" 0] [0 "0" 0] \o]
-               [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] ::c/delete]
-               [[3 "9FyYzf9pum6E4" 0] [2 "Pz8iuNCXvVsYN" 0] \u]
-               [[2 "NwudSBdQg3Ru2" 0] [1 "Pz8iuNCXvVsYN" 0] \space]]
+  (let [nodes [[[1 "Pz8iuNCXvVsYN"] [0 "0"] \o]
+               [[2 "Pz8iuNCXvVsYN"] [1 "Pz8iuNCXvVsYN"] ::c/delete]
+               [[3 "9FyYzf9pum6E4"] [2 "Pz8iuNCXvVsYN"] \u]
+               [[2 "NwudSBdQg3Ru2"] [1 "Pz8iuNCXvVsYN"] \space]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \j]
-               [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \w]
-               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::c/delete]]
+  (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \j]
+               [[1 "VdIJLRISw~zgo"] [0 "0"] \w]
+               [[1 "A~iIXinAXkGX7"] [0 "0"] ::c/delete]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \u]
-               [[2 "W7XhooU1Hsw7E" 0] [1 "W7XhooU1Hsw7E" 0] \space]
-               [[2 "7hLbMKLvcll_4" 0] [1 "W7XhooU1Hsw7E" 0] ::c/delete]
-               [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \m]]
+  (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \u]
+               [[2 "W7XhooU1Hsw7E"] [1 "W7XhooU1Hsw7E"] \space]
+               [[2 "7hLbMKLvcll_4"] [1 "W7XhooU1Hsw7E"] ::c/delete]
+               [[1 "VdIJLRISw~zgo"] [0 "0"] \m]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "Ftbpo0oG7ZnpR" 0] [0 "0" 0] ::c/delete]
-               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::c/delete]]
+  (let [nodes [[[1 "Ftbpo0oG7ZnpR"] [0 "0"] ::c/delete]
+               [[1 "A~iIXinAXkGX7"] [0 "0"] ::c/delete]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] ::c/delete]
-               [[2 "A~iIXinAXkGX7" 0] [1 "VdIJLRISw~zgo" 0] "j"]
-               [[3 "A~iIXinAXkGX7" 0] [0 "0" 0] "i"]
-               [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] "s"]]
+  (let [nodes [[[1 "VdIJLRISw~zgo"] [0 "0"] ::c/delete]
+               [[2 "A~iIXinAXkGX7"] [1 "VdIJLRISw~zgo"] "j"]
+               [[3 "A~iIXinAXkGX7"] [0 "0"] "i"]
+               [[1 "W7XhooU1Hsw7E"] [0 "0"] "s"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 " f " 0] [0 "0" 0] ::c/delete]
-               [[2 " z " 0] [1 " f " 0] " "]
-               [[2 " f " 0] [0 "0" 0] "l"]
-               [[2 " a " 0] [1 " f " 0] "v"]]
+  (let [nodes [[[1 " f "] [0 "0"] ::c/delete]
+               [[2 " z "] [1 " f "] " "]
+               [[2 " f "] [0 "0"] "l"]
+               [[2 " a "] [1 " f "] "v"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 " f " 0] [0 "0" 0] ::c/delete]
-               [[2 " f " 0] [0 "0" 0] ::c/delete]
-               [[3 " a " 0] [2 " f " 0] "c"]
-               [[2 " z " 0] [1 " f " 0] "r"]]
+  (let [nodes [[[1 " f "] [0 "0"] ::c/delete]
+               [[2 " f "] [0 "0"] ::c/delete]
+               [[3 " a "] [2 " f "] "c"]
+               [[2 " z "] [1 " f "] "r"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct)))
 
@@ -148,7 +148,7 @@ respecting it." #" "))
             site-id (c/guid)]
        (if (not-empty phrase)
          (let [cause (last (get-in ct [::c/yarns site-id]))
-               node  (c/node (inc (or (ffirst cause) 1)) site-id 0
+               node  (c/node (inc (or (ffirst cause) 1)) site-id
                              (or (first cause) c/root-id) (first phrase))]
                ; (rand-node ct site-id (first phrase))]
            (recur (c/insert ct node)
@@ -221,7 +221,6 @@ respecting it." #" "))
   (gen/generate (s/gen ::c/root))
   (gen/generate (s/gen ::c/node))
   (gen/generate (s/gen ::c/value))
-  (gen/generate (s/gen ::c/priority))
   (gen/generate (s/gen ::c/causal-tree))
 
   (stest/instrument `c/node)
@@ -244,29 +243,29 @@ respecting it." #" "))
     (::c/weave (c/weave @ct))
     (swap! ct c/weave)
 
-    (def test-node (c/node 1 (c/guid) 0 c/root-id \c))
-    (def test-node-2 (c/node 2 (c/guid) 0 (first test-node) \a))
-    (def test-node-3 (c/node 3 (c/guid) 0 (first test-node-2) \r))
+    (def test-node (c/node 1 (c/guid) c/root-id \c))
+    (def test-node-2 (c/node 2 (c/guid) (first test-node) \a))
+    (def test-node-3 (c/node 3 (c/guid) (first test-node-2) \r))
     (swap! ct c/insert test-node)
     (swap! ct c/insert test-node-2)
     (swap! ct c/insert test-node-3)
 
-    (swap! ct c/append ::c/delete (first test-node-3) 0)
-    (swap! ct c/append \t (first test-node-2) 0)
-    (swap! ct c/append \k (first test-node) 0)
-    (swap! ct c/append ::c/delete (first test-node) 0)
+    (swap! ct c/append ::c/delete (first test-node-3))
+    (swap! ct c/append \t (first test-node-2))
+    (swap! ct c/append \k (first test-node))
+    (swap! ct c/append ::c/delete (first test-node))
 
     (c/materialize @ct)
 
     (def some-weft-ids (map (comp first last last) (::c/yarns @ct)))
     (c/weft @ct some-weft-ids)
-    ; (c/materialize (c/weft @ct [[0 "0" 0]
-    ;                             [1 "SoEKxJ2JiC5dY" 0]
-    ;                             [2 "81KYDSlVWQD0~" 0]
-    ;                             [3 "rTCvwmeN3eRbJ" 0]
-    ;                             [7 "STVsuW03bB8zO" 0]
-    ;                             ; [19 "YHBqZnNGiunOS" 0]
-    ;                             [18 "rOYr~lq0ByHG2" 0]]))
+    ; (c/materialize (c/weft @ct [[0 "0"]
+    ;                             [1 "SoEKxJ2JiC5dY"]
+    ;                             [2 "81KYDSlVWQD0~"]
+    ;                             [3 "rTCvwmeN3eRbJ"]
+    ;                             [7 "STVsuW03bB8zO"]
+    ;                             ; [19 "YHBqZnNGiunOS"]
+    ;                             [18 "rOYr~lq0ByHG2"]]))
     ; (ds/view @ct)
     ; (ds/view (::c/yarns @ct))
     ; (ds/view (::c/weave @ct))
@@ -274,32 +273,32 @@ respecting it." #" "))
     (do
       ; " and the hat"
       (def sa (c/guid))
-      (def n1a (c/node 8 sa 0 (ffirst (reverse (::c/weave @ct))) (first " ")))
-      (def n2a (c/node 9 sa 0 (first n1a) \a))
-      (def n3a (c/node 10 sa 0 (first n2a) \n))
-      (def n4a (c/node 11 sa 0 (first n3a) \d))
-      (def n5a (c/node 12 sa 0 (first n4a) (first " ")))
-      (def n6a (c/node 13 sa 0 (first n5a) \t))
-      (def n7a (c/node 14 sa 0 (first n6a) \h))
-      (def n8a (c/node 15 sa 0 (first n7a) \e))
-      (def n9a (c/node 16 sa 0 (first n8a) (first " ")))
-      (def n10a (c/node 17 sa 0 (first n9a) \h))
-      (def n11a (c/node 18 sa 0 (first n10a) \a))
-      (def n12a (c/node 19 sa 0 (first n11a) \t))
+      (def n1a (c/node 8 sa (ffirst (reverse (::c/weave @ct))) (first " ")))
+      (def n2a (c/node 9 sa (first n1a) \a))
+      (def n3a (c/node 10 sa (first n2a) \n))
+      (def n4a (c/node 11 sa (first n3a) \d))
+      (def n5a (c/node 12 sa (first n4a) (first " ")))
+      (def n6a (c/node 13 sa (first n5a) \t))
+      (def n7a (c/node 14 sa (first n6a) \h))
+      (def n8a (c/node 15 sa (first n7a) \e))
+      (def n9a (c/node 16 sa (first n8a) (first " ")))
+      (def n10a (c/node 17 sa (first n9a) \h))
+      (def n11a (c/node 18 sa (first n10a) \a))
+      (def n12a (c/node 19 sa (first n11a) \t))
       ; "s love dogs"
       (def sb (c/guid))
-      ; (def n1b (c/node 8 sb 0 (first (nth (reverse (::c/weave @ct)) 2)) \s))
-      (def n1b (c/node 8 sb 0 (second n1a) \s))
-      (def n2b (c/node 9 sb 0 (first n1b) (first " ")))
-      (def n3b (c/node 10 sb 0 (first n2b) \l))
-      (def n4b (c/node 11 sb 0 (first n3b) \o))
-      (def n5b (c/node 12 sb 0 (first n4b) \v))
-      (def n6b (c/node 13 sb 0 (first n5b) \e))
-      (def n7b (c/node 14 sb 0 (first n6b) (first " ")))
-      (def n8b (c/node 15 sb 0 (first n7b) \d))
-      (def n9b (c/node 16 sb 0 (first n8b) \o))
-      (def n10b (c/node 17 sb 0 (first n9b) \g))
-      (def n11b (c/node 18 sb 0 (first n10b) \s))
+      ; (def n1b (c/node 8 sb (first (nth (reverse (::c/weave @ct)) 2)) \s))
+      (def n1b (c/node 8 sb (second n1a) \s))
+      (def n2b (c/node 9 sb (first n1b) (first " ")))
+      (def n3b (c/node 10 sb (first n2b) \l))
+      (def n4b (c/node 11 sb (first n3b) \o))
+      (def n5b (c/node 12 sb (first n4b) \v))
+      (def n6b (c/node 13 sb (first n5b) \e))
+      (def n7b (c/node 14 sb (first n6b) (first " ")))
+      (def n8b (c/node 15 sb (first n7b) \d))
+      (def n9b (c/node 16 sb (first n8b) \o))
+      (def n10b (c/node 17 sb (first n9b) \g))
+      (def n11b (c/node 18 sb (first n10b) \s))
       (swap! ct c/insert n1a)
       (swap! ct c/insert n2a)
       (swap! ct c/insert n3a)
