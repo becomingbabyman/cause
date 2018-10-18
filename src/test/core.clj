@@ -17,8 +17,8 @@
 (def simple-values
   (concat [:x :x :x \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
-(def site-ids [0 1 2])
-; (def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
+; (def site-ids [0 1 2])
+(def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
 
 (defn rand-node
   ([causal-tree] (rand-node causal-tree (rand-nth site-ids)))
@@ -120,8 +120,8 @@
 
 (comment
   (known-idempotent-insert-edge-cases)
-  (keep (fn [_] (find-weave-inconsistencies 99))
-        (range 99)))
+  (keep (fn [_] (find-weave-inconsistencies 9))
+        (range 999)))
 
 (def prose (string/split "Hereupon Legrand arose, with a grave and stately air, and brought me the beetle
 from a glass case in which it was enclosed. It was a beautiful scarabaeus, and, at
@@ -156,15 +156,11 @@ respecting it." #" "))
                   (if (not-empty (rest phrase)) (rest phrase) (first phrases))
                   (if (not-empty (rest phrase)) phrases (rest phrases))
                   (if (not-empty (rest phrase)) site-id (c/guid))))
-         (do
-           ; (pprint insertions)
-           ; (println "------------------------")
-           ; (println "------------------------")
-           ; (println "------------------------")
-           ; (pprint (::c/weave ct))
-           {:phrases starting-phrases
-            :materialized-weave (c/materialize ct)
-            :materialized-reweave (c/materialize (c/weave ct))}))))))
+         {:ct ct
+          :insertions insertions
+          :phrases starting-phrases
+          :materialized-weave (c/materialize ct)
+          :materialized-reweave (c/materialize (c/weave ct))})))))
 
 (deftest concurrent-runs-stick-together
   (let [result (rand-weave-of-phrases 5)]
@@ -176,12 +172,32 @@ respecting it." #" "))
   (rand-weave-of-phrases 3)
   (concurrent-runs-stick-together))
 
-; (deftest causal-tree
-;   (insert)
-;   (append)
-;   (weave)
-;   (merge)
-;   (weft))
+(deftest causal-tree
+  (known-idempotent-insert-edge-cases)
+  (keep (fn [_] (find-weave-inconsistencies 9))
+        (range 999))
+  (concurrent-runs-stick-together))
+  ; (insert)
+  ; (append)
+  ; (weave)
+  ; (weft)
+  ; (merge)
+
+(comment
+  (causal-tree))
+
+(comment
+  (def tct (atom (c/new-causal-tree)))
+  (swap! tct c/my-assoc :a 1)
+  (idempotent? @tct))
+
+(comment
+  [:document
+   [:paragraph
+    "foo"
+    [:strikethrough [:bold "bar"]]
+    [:text  "fizz"]
+    [:text {:marks [:bold]} "buzz"]]])
 
 (comment
   (do

@@ -17,14 +17,14 @@
 ; Follow up paper (more detailed impl): https://www.dropbox.com/s/6go311vjfqhgd6f/Deep_hypertext_with_embedded_revision_co.pdf?dl=0
 
 (def site-id-length 13)
-(def keywords {:x :delete})
+(def keywords {:x :delete}) ; TODO: change to ::x or something else fully qualified.
 (def root-id [0 "0" 0])
 (def root-node [root-id nil nil])
 
 (defn gen-string [length]
   (gen/fmap #(apply str %) (gen/vector (gen/char-alpha) length)))
 
-(s/def ::lamport-ts (s/and int? (comp not neg?))) ; AKA the index in a yarn
+(s/def ::lamport-ts nat-int?) ; AKA the index in a yarn
 ; TODO: should a wall-clock-ts be added? If a central Datomic DB is used then nodes will get a wall clock ts based on when they were synced to the server...
 (s/def ::priority #{0 1}) ; TODO: is this even needed? The idea is to use it to help with operations like delete, but it's unclear if that op will pose a challenge without this.
 (s/def ::basic-guid (s/with-gen (s/and string? #(or
@@ -77,8 +77,8 @@
   ([length] (nano-id length)))
 
 (defn node
-  ([node-kv-tuple] ; maps the keys / values in the ::nodes map back to nodes
-   (into [(first node-kv-tuple)] (second node-kv-tuple)))
+  ([[k v :as node-kv-tuple]] ; maps the keys / values in the ::nodes map back to nodes
+   (into [k] v))
   ([lamport-ts site-id priority cause value]
    [[lamport-ts site-id priority]
     cause
@@ -253,7 +253,7 @@
    (->> (::weave causal-tree)
         (partition 3 1 nil)
         (keep (partial materialize causal-tree))
-        (reduce str)))
+        (apply str)))
   ([causal-tree [nl nm nr]]
    (cond
      (= :x (last nm)) nil ; Don't return deletes.
