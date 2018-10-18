@@ -15,7 +15,7 @@
 (pjstadig.humane-test-output/activate!)
 
 (def simple-values
-  (concat [:x :x :x \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
+  (concat [::c/delete ::c/delete ::c/delete \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
 ; (def site-ids [0 1 2])
 (def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
@@ -49,7 +49,7 @@
     ; (is (= causal-tree refreshed-ct))))
 
 (deftest known-idempotent-insert-edge-cases
-  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] :x]
+  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] ::c/delete]
                [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \d]
                [[3 "9FyYzf9pum6E4" 0] [0 "0" 0] \r]
                [[4 "NwudSBdQg3Ru2" 0] [3 "9FyYzf9pum6E4" 0] \space]
@@ -63,40 +63,40 @@
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "Pz8iuNCXvVsYN" 0] [0 "0" 0] \o]
-               [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] :x]
+               [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] ::c/delete]
                [[3 "9FyYzf9pum6E4" 0] [2 "Pz8iuNCXvVsYN" 0] \u]
                [[2 "NwudSBdQg3Ru2" 0] [1 "Pz8iuNCXvVsYN" 0] \space]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \j]
                [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \w]
-               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] :x]]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::c/delete]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \u]
                [[2 "W7XhooU1Hsw7E" 0] [1 "W7XhooU1Hsw7E" 0] \space]
-               [[2 "7hLbMKLvcll_4" 0] [1 "W7XhooU1Hsw7E" 0] :x]
+               [[2 "7hLbMKLvcll_4" 0] [1 "W7XhooU1Hsw7E" 0] ::c/delete]
                [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \m]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "Ftbpo0oG7ZnpR" 0] [0 "0" 0] :x]
-               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] :x]]
+  (let [nodes [[[1 "Ftbpo0oG7ZnpR" 0] [0 "0" 0] ::c/delete]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::c/delete]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] :x]
+  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] ::c/delete]
                [[2 "A~iIXinAXkGX7" 0] [1 "VdIJLRISw~zgo" 0] "j"]
                [[3 "A~iIXinAXkGX7" 0] [0 "0" 0] "i"]
                [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] "s"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 " f " 0] [0 "0" 0] :x]
+  (let [nodes [[[1 " f " 0] [0 "0" 0] ::c/delete]
                [[2 " z " 0] [1 " f " 0] " "]
                [[2 " f " 0] [0 "0" 0] "l"]
                [[2 " a " 0] [1 " f " 0] "v"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
     (idempotent? ct))
-  (let [nodes [[[1 " f " 0] [0 "0" 0] :x]
-               [[2 " f " 0] [0 "0" 0] :x]
+  (let [nodes [[[1 " f " 0] [0 "0" 0] ::c/delete]
+               [[2 " f " 0] [0 "0" 0] ::c/delete]
                [[3 " a " 0] [2 " f " 0] "c"]
                [[2 " z " 0] [1 " f " 0] "r"]]
         ct (reduce c/insert (c/new-causal-tree) nodes)]
@@ -251,10 +251,10 @@ respecting it." #" "))
     (swap! ct c/insert test-node-2)
     (swap! ct c/insert test-node-3)
 
-    (swap! ct c/append :x (first test-node-3) 0)
+    (swap! ct c/append ::c/delete (first test-node-3) 0)
     (swap! ct c/append \t (first test-node-2) 0)
     (swap! ct c/append \k (first test-node) 0)
-    (swap! ct c/append :x (first test-node) 0)
+    (swap! ct c/append ::c/delete (first test-node) 0)
 
     (c/materialize @ct)
 

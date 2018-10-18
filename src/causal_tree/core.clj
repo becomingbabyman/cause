@@ -17,7 +17,7 @@
 ; Follow up paper (more detailed impl): https://www.dropbox.com/s/6go311vjfqhgd6f/Deep_hypertext_with_embedded_revision_co.pdf?dl=0
 
 (def site-id-length 13)
-(def keywords {:x :delete}) ; TODO: change to ::x or something else fully qualified.
+(def speical-keywords #{::delete})
 (def root-id [0 "0" 0])
 (def root-node [root-id nil nil])
 
@@ -34,7 +34,7 @@
 (s/def ::site-id ::basic-guid)
 (s/def ::id (s/tuple ::lamport-ts ::site-id ::priority))
 (s/def ::cause ::id)
-(s/def ::value (s/or :c char? :k (set (keys keywords)))) ; TODO: start with text and expand to support more value types later.
+(s/def ::value (s/or :c char? :special-k speical-keywords)) ; TODO: start with text and expand to support more value types later.
 
 ; AKA an atom in CT parlance.
 (s/def ::node (s/cat :id ::id
@@ -171,24 +171,24 @@
   [nl nm nr seen]
   (or
    (and
-    (= :x (last nr)) ; if the next node is a delete
+    (= ::delete (last nr)) ; if the next node is a delete
     (not= (first nm) (second nr)) ; and it does not delete this node, don't weave
-    (or (not= :x (last nm)) ; and this node is not also a delete
+    (or (not= ::delete (last nm)) ; and this node is not also a delete
         (<< (first nm) (first nr)))) ; or if it is, it is older, don't weave.
    (and
     (or (= (first nl) (second nr)) ; if the next node is caused by the previous node
         (= (second nl) (second nr)) ; or if the next node shares a cause with the previous node
         (get seen (second nr))) ; or the next node is caused by a seen node
     (<< (first nm) (first nr)) ; and this node is older
-    (or (not= :x (last nm)) ; and this node is not a delete
-        (= :x (last nr)))) ; or the next node is a delete, don't weave.
+    (or (not= ::delete (last nm)) ; and this node is not a delete
+        (= ::delete (last nr)))) ; or the next node is a delete, don't weave.
    (and
     ; (or (= (second nm) (second nr)) ; if this node and the next node are caused by the same node
     ;     (and (not= (first nl) (second nr)) ; the next node is not part of a run
     ;          (not= (first nl) (second nm)))) ; and this node is not part of a run
     (<< (first nm) (first nr)) ; and this node is older
-    (or (not= :x (last nm)) ; and this node is not a delete
-        (= :x (last nr)))))) ; or the next node is a delete, don't weave.
+    (or (not= ::delete (last nm)) ; and this node is not a delete
+        (= ::delete (last nr)))))) ; or the next node is a delete, don't weave.
 
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
@@ -256,8 +256,8 @@
         (apply str)))
   ([causal-tree [nl nm nr]]
    (cond
-     (= :x (last nm)) nil ; Don't return deletes.
-     (and (= :x (last nr)) ; If the next node is a delete
+     (= ::delete (last nm)) nil ; Don't return deletes.
+     (and (= ::delete (last nr)) ; If the next node is a delete
           (= (first nm) (second nr))) nil ; and it deletes this node, return nil
      :else (last nm)))) ; Return the value.
 
