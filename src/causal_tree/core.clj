@@ -1,6 +1,6 @@
 (ns causal-tree.core
   (:require
-   [nano-id.core :refer [nano-id]]
+   [causal-tree.util :as util :refer [<< guid]]
    [clojure.spec.alpha :as s]
    [clojure.spec.gen.alpha :as gen]))
 
@@ -16,7 +16,6 @@
 ; Original paper: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.627.5286&rep=rep1&type=pdf
 ; Follow up paper (more detailed impl): https://www.dropbox.com/s/6go311vjfqhgd6f/Deep_hypertext_with_embedded_revision_co.pdf?dl=0
 
-(def site-id-length 13)
 (def speical-keywords #{::delete})
 (def root-id [0 "0"])
 (def root-node [root-id nil nil])
@@ -27,13 +26,15 @@
 (s/def ::lamport-ts nat-int?) ; AKA the index in a yarn
 ; TODO: should a wall-clock-ts be added? If a central Datomic DB is used then nodes will get a wall clock ts based on when they were synced to the server...
 (s/def ::basic-guid (s/with-gen (s/and string? #(or
-                                                 (= (count %) site-id-length)
+                                                 (= (count %) util/site-id-length)
                                                  (= % "0")))
-                                #(gen-string site-id-length)))
+                                #(gen-string util/site-id-length)))
 (s/def ::site-id ::basic-guid)
 (s/def ::id (s/tuple ::lamport-ts ::site-id))
 (s/def ::cause ::id)
-(s/def ::value (s/or :c char? :special-k speical-keywords)) ; TODO: start with text and expand to support more value types later.
+(s/def ::value (s/or :special-k speical-keywords
+                     :k keyword?
+                     :c char?))
 
 ; AKA an atom in CT parlance.
 (s/def ::node (s/cat :id ::id
@@ -53,35 +54,11 @@
 (s/def ::causal-tree (s/keys :req [::nodes ::lamport-ts ::site-id]
                              :opt [::yarns ::weave]))
 
-(defn <<
-  "Return non-nil if runs of any type are in
-  monotonically increasing order."
-  ([a b]
-   (< (compare a b) 0))
-  ([a b & more]
-   (and (<< a b) (apply << b more))))
-
-(defn guid
-  "Returns a globally unique ID, encoded to take up as little
-  space as possible. The default is a length of 13 characters
-  which copromises uniqueness for space savings given these ids
-  will be scoped to CRDTs that will likely never never exceed 1M
-  unique ids. Pass a length parameter if you expect to need more
-  uniqueness. See this site for help picking a reasonable
-  length https://zelark.github.io/nano-id-cc/. The default for
-  nano-id is 21 which maps similarly to the uniqueness of most uuid
-  generators and is a good default if your scope is not bounded."
-  ; TODO: consider the tradoffs of nano-id compared to a standard uuid implmentation https://www.itu.int/en/ITU-T/asn1/Pages/UUID/uuids.aspx
-  ([] (guid site-id-length))
-  ([length] (nano-id length)))
-
 (defn node
-  ([[k v :as node-kv-tuple]] ; maps the keys / values in the ::nodes map back to nodes
+  ([[k v]] ; maps the keys / values in the ::nodes map back to nodes
    (into [k] v))
   ([lamport-ts site-id cause value]
-   [[lamport-ts site-id]
-    cause
-    value]))
+   [[lamport-ts site-id] cause value]))
 (s/fdef node
         :args (s/or
                :arity-1 (s/cat :node-kv-tuple (s/tuple ::id seqable?))
@@ -101,31 +78,6 @@
    ::yarns {(second (first root-node)) [root-node]}
    ::weave [root-node]})
 
-(defn sorted-ins-index
-  "Returns the insertion index for the target assuming the collection
-  is already sorted."
-  ([coll target] (sorted-ins-index coll target {:uniq false}))
-  ([coll target options]
-   (loop [low-idx 0
-          high-idx (dec (count coll))]
-     (if (> low-idx high-idx)
-       low-idx
-       (let [mid-idx (quot (+ low-idx high-idx) 2)
-             mid-val (coll mid-idx)]
-         (cond
-           (= mid-val target) (if (:uniq options) nil mid-idx)
-           (< (compare mid-val target) 0) (recur (inc mid-idx) high-idx)
-           (> (compare mid-val target) 0) (recur low-idx (dec mid-idx))))))))
-
-(defn ins
-  "Returns a vector with a value inserted at the index. Prefer using
-  core clojure seq functions like conj over this, for better performance.
-  If no index is specified, assume the vector is sorted and try to maintain
-  the sort on insert."
-  ([coll val] (if-let [i (sorted-ins-index coll val {:uniq true})]
-                (ins coll i val) coll))
-  ([coll i val] (vec (concat (take i coll) [val] (drop i coll)))))
-
 (defn spin
   "Spin yarn(s)...
   Returns a causal-tree with updated yarn index. If a node is passed
@@ -143,7 +95,7 @@
      (if-let [yarn (get-in causal-tree [::yarns site-id])]
        (if (> (ffirst node) (ffirst (last yarn))) ; compare lamport timestamps
          (update-in causal-tree [::yarns site-id] conj node)
-         (update-in causal-tree [::yarns site-id] ins node)) ; ins is expensive. Avoid it.
+         (update-in causal-tree [::yarns site-id] util/insert node)) ; util/insert is expensive. Avoid it.
        (assoc-in causal-tree [::yarns site-id] [node])))))
 
 (defn refresh-ts
@@ -246,7 +198,8 @@
 ; TODO: rename to ct->edn
 (defn materialize
   "Returns the current state of the tree as edn. E.g. a tree of chars
-  will materialize as a string."
+  will materialize as a string. This is mostly for testing and pretty
+  printing. In most cases it's prefferable to work with the whole tree."
   ([causal-tree]
    (->> (::weave causal-tree)
         (partition 3 1 nil)

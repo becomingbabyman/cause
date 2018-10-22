@@ -1,5 +1,6 @@
 (ns test.core
   (:require
+   [causal-tree.util :as util]
    [causal-tree.core :as c]
    [clojure.pprint :refer [pprint]]
    [clojure.string :as string]
@@ -18,7 +19,7 @@
   (concat [::c/delete ::c/delete ::c/delete \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
 ; (def site-ids [0 1 2])
-(def site-ids [(c/guid) (c/guid) (c/guid) (c/guid) (c/guid)])
+(def site-ids [(util/guid) (util/guid) (util/guid) (util/guid) (util/guid)])
 
 (defn rand-node
   ([causal-tree] (rand-node causal-tree (rand-nth site-ids)))
@@ -36,8 +37,7 @@
      (c/node lamport-ts site-id cause value))))
 
 (defn insert-rand-node
-  ([causal-tree] (insert-rand-node causal-tree (rand-node causal-tree)))
-  ([causal-tree node] (c/insert causal-tree node)))
+  ([causal-tree] (c/insert causal-tree (rand-node causal-tree))))
 
 (defn idempotent? [causal-tree]
   (let [refreshed-ct (c/refresh-caches causal-tree)]
@@ -145,7 +145,7 @@ respecting it." #" "))
             insertions []
             phrase (first starting-phrases)
             phrases (rest starting-phrases)
-            site-id (c/guid)]
+            site-id (util/guid)]
        (if (not-empty phrase)
          (let [cause (last (get-in ct [::c/yarns site-id]))
                node  (c/node (inc (or (ffirst cause) 1)) site-id
@@ -155,7 +155,7 @@ respecting it." #" "))
                   (conj insertions node)
                   (if (not-empty (rest phrase)) (rest phrase) (first phrases))
                   (if (not-empty (rest phrase)) phrases (rest phrases))
-                  (if (not-empty (rest phrase)) site-id (c/guid))))
+                  (if (not-empty (rest phrase)) site-id (util/guid))))
          {:ct ct
           :insertions insertions
           :phrases starting-phrases
@@ -187,22 +187,18 @@ respecting it." #" "))
   (causal-tree))
 
 (comment
-  (def tct (atom (c/new-causal-tree)))
-  (swap! tct c/my-assoc :a 1)
-  (idempotent? @tct))
-
-(comment
   [:document
-   [:paragraph
+   [:b/paragraph
     "foo"
-    [:strikethrough [:bold "bar"]]
-    [:text  "fizz"]
+    [:m/italic [:bold "bar"]]
+    [:i/link {:url "http://npr.org"} "fizz"]
     [:text {:marks [:bold]} "buzz"]]])
 
 (comment
   (do
     (def tct (atom (c/new-causal-tree)))
     (do (time (swap! tct insert-rand-node)) nil)
+    (swap! tct c/insert (rand-node @tct (::c/site-id @tct) :yolo))
     (time (do (doall (repeatedly 50 #(swap! tct insert-rand-node))) nil))
     (time (clojure.pprint/pprint (c/materialize @tct)))
     (count (::c/nodes @tct))
@@ -231,7 +227,7 @@ respecting it." #" "))
   (do
     (def ct (atom (c/new-causal-tree)))
 
-    (c/ins [[1 1] [2 2] [4 4]] [3 3])
+    (util/insert [[1 1] [2 2] [4 4]] [3 3])
 
     ; (swap! ct assoc ::yarns {})
     (deref ct)
@@ -243,9 +239,9 @@ respecting it." #" "))
     (::c/weave (c/weave @ct))
     (swap! ct c/weave)
 
-    (def test-node (c/node 1 (c/guid) c/root-id \c))
-    (def test-node-2 (c/node 2 (c/guid) (first test-node) \a))
-    (def test-node-3 (c/node 3 (c/guid) (first test-node-2) \r))
+    (def test-node (c/node 1 (util/guid) c/root-id \c))
+    (def test-node-2 (c/node 2 (util/guid) (first test-node) \a))
+    (def test-node-3 (c/node 3 (util/guid) (first test-node-2) \r))
     (swap! ct c/insert test-node)
     (swap! ct c/insert test-node-2)
     (swap! ct c/insert test-node-3)
@@ -272,7 +268,7 @@ respecting it." #" "))
 
     (do
       ; " and the hat"
-      (def sa (c/guid))
+      (def sa (util/guid))
       (def n1a (c/node 8 sa (ffirst (reverse (::c/weave @ct))) (first " ")))
       (def n2a (c/node 9 sa (first n1a) \a))
       (def n3a (c/node 10 sa (first n2a) \n))
@@ -286,7 +282,7 @@ respecting it." #" "))
       (def n11a (c/node 18 sa (first n10a) \a))
       (def n12a (c/node 19 sa (first n11a) \t))
       ; "s love dogs"
-      (def sb (c/guid))
+      (def sb (util/guid))
       ; (def n1b (c/node 8 sb (first (nth (reverse (::c/weave @ct)) 2)) \s))
       (def n1b (c/node 8 sb (second n1a) \s))
       (def n2b (c/node 9 sb (first n1b) (first " ")))
