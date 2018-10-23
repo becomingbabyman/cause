@@ -1,7 +1,7 @@
 (ns test.list
   (:require
    [causal-tree.util :as u]
-   [causal-tree.spec :as s]
+   [causal-tree.shared :as s]
    [causal-tree.core :as c]
    [clojure.pprint :refer [pprint]]
    [clojure.string :as string]

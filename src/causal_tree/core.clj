@@ -1,19 +1,19 @@
 (ns causal-tree.core
   (:require
-   [causal-tree.spec :as s]
+   [causal-tree.shared :as s]
    [causal-tree.list :as ct-list]
    [causal-tree.map :as ct-map]))
 
-(defn node [& args] (apply ct-list/node args))
+(def node s/node)
 
 (defn new-causal-tree [type]
   (case type
     ::s/list (ct-list/new-causal-tree)
     ::s/map (ct-map/new-causal-tree)))
 
-(defn spin [& args] (apply ct-list/spin args))
+(def spin s/spin)
 
-(defn refresh-ts [causal-tree] (ct-list/refresh-ts causal-tree))
+(def refresh-ts s/refresh-ts)
 
 (defn weave [& args] (apply ct-list/weave args))
 

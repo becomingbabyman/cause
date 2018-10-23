@@ -1,25 +1,7 @@
 (ns causal-tree.list
   (:require
    [causal-tree.util :as u :refer [<< guid]]
-   [causal-tree.spec :as s]
-   [clojure.spec.alpha :as spec]))
-
-(defn node
-  ([[k v]] ; maps the keys / values in the ::s/nodes map back to nodes
-   (into [k] v))
-  ([lamport-ts site-id cause value]
-   [[lamport-ts site-id] cause value]))
-(spec/fdef node
-           :args (spec/or
-                  :arity-1 (spec/cat :node-kv-tuple (spec/tuple ::s/id seqable?))
-                  :arity-5 (spec/and
-                            (spec/cat :lamport-ts ::s/lamport-ts
-                                      :site-id ::s/site-id
-                                      :cause ::s/cause
-                                      :value ::s/value)
-                            #(> (:lamport-ts %) (first (:cause %))))) ; node ts must be more than cause ts
-           :ret ::s/node
-           :fn (spec/and #(not= (first (:ret %)) (get-in % [:args :cause])))) ; cause can't equal node-id
+   [causal-tree.shared :as s]))
 
 (defn new-causal-tree []
   {::s/type ::s/list
@@ -28,34 +10,6 @@
    ::s/nodes {(first s/root-node) (rest s/root-node)}
    ::s/yarns {(second (first s/root-node)) [s/root-node]}
    ::s/weave [s/root-node]})
-
-(defn spin
-  "Spin yarn(s)...
-  Returns a causal-tree with updated yarn index. If a node is passed
-  only the yarn relating to that node will be updated. Otherwise the
-  entire tree will be traversed and (re)indexed."
-  ([causal-tree]
-   (loop [ct1 causal-tree
-          sorted-nodes (pmap node (sort (::s/nodes causal-tree)))]
-     (if (empty? sorted-nodes)
-       ct1
-       (recur (spin ct1 (first sorted-nodes))
-              (rest sorted-nodes)))))
-  ([causal-tree node]
-   (let [site-id (second (first node))]
-     (if-let [yarn (get-in causal-tree [::s/yarns site-id])]
-       (if (> (ffirst node) (ffirst (last yarn))) ; compare lamport timestamps
-         (update-in causal-tree [::s/yarns site-id] conj node)
-         (update-in causal-tree [::s/yarns site-id] u/insert node)) ; u/insert is expensive. Avoid it.
-       (assoc-in causal-tree [::s/yarns site-id] [node])))))
-
-(defn refresh-ts
-  "Refreshes the ::s/lamport-ts to make sure it's the max value in the tree.
-  Expects ::s/yarns cache to be up to date and sorted."
-  [causal-tree]
-  (->> (::s/yarns causal-tree)
-       (reduce #(max %1 (ffirst (last (last %2)))) 0)
-       (assoc causal-tree ::s/lamport-ts)))
 
 (defn weave-asap?
   "Takes a left, a middle and a right node. Returns true if the middle
@@ -96,7 +50,7 @@
   If a node is passed only that node will be woven in O(n)."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave [])
-           (pmap node (sort (::s/nodes causal-tree)))))
+           (pmap s/node (sort (::s/nodes causal-tree)))))
   ([causal-tree node]
    (if (not (get-in causal-tree [::s/nodes (first node)]))
      causal-tree
@@ -134,7 +88,7 @@
                   (assoc-in causal-tree [::s/lamport-ts] (ffirst node))
                   causal-tree)
             ct3 (assoc-in ct2 [::s/nodes (first node)] (rest node))
-            ct4 (spin ct3 node)
+            ct4 (s/spin ct3 node)
             ct5 (weave ct4 node)]
         ct5))))
 
@@ -143,7 +97,7 @@
   local site-id and lamport-ts."
   [causal-tree value cause]
   (let [ct2 (update-in causal-tree [::s/lamport-ts] inc)
-        node (node (::s/lamport-ts ct2) (::s/site-id ct2) cause value)]
+        node (s/node (::s/lamport-ts ct2) (::s/site-id ct2) cause value)]
     (insert ct2 node)))
 
 ; TODO: rename to ct->edn
@@ -168,8 +122,8 @@
    of ::s/weave ::s/yarns etc. Useful when loading in ::s/nodes."
   [causal-tree]
   (->> causal-tree
-       (spin)
-       (refresh-ts)
+       (s/spin)
+       (s/refresh-ts)
        (weave)))
 
 (defn yarns->nodes
@@ -197,7 +151,7 @@
         (recur (as-> (get-in causal-tree [::s/yarns (second id)]) $
                      (take-while #(not= id (first %)) $)
                      (vec $)
-                     (conj $ (node [id (get-in causal-tree [::s/nodes id])]))
+                     (conj $ (s/node [id (get-in causal-tree [::s/nodes id])]))
                      (assoc-in new-ct [::s/yarns (second id)] $))
                (first more-ids) (rest more-ids))
         (-> new-ct

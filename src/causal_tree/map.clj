@@ -1,8 +1,7 @@
 (ns causal-tree.map
   (:require
    [causal-tree.util :as u :refer [<< guid]]
-   [causal-tree.spec :as s]
-   [clojure.spec.alpha :as spec]))
+   [causal-tree.shared :as s]))
 
 (defn new-causal-tree []
   {::s/type ::s/map
