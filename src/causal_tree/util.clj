@@ -1,8 +1,7 @@
 (ns causal-tree.util
   (:require
+   [causal-tree.spec :as s]
    [nano-id.core :refer [nano-id]]))
-
-(def site-id-length 13)
 
 (defn <<
   "Return non-nil if runs of any type are in
@@ -23,7 +22,7 @@
   nano-id is 21 which maps similarly to the uniqueness of most uuid
   generators and is a good default if your scope is not bounded."
   ; TODO: consider the tradoffs of nano-id compared to a standard uuid implmentation https://www.itu.int/en/ITU-T/asn1/Pages/UUID/uuids.aspx
-  ([] (guid site-id-length))
+  ([] (guid s/site-id-length))
   ([length] (nano-id length)))
 
 (defn sorted-insertion-index
