@@ -8,8 +8,8 @@
 
 (defn new-causal-tree [type]
   (case type
-    ::s/list (ct-list/new-causal-tree)
-    ::s/map (ct-map/new-causal-tree)))
+    :list (ct-list/new-causal-tree)
+    :map (ct-map/new-causal-tree)))
 
 (def spin s/spin)
 

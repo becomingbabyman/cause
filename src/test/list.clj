@@ -55,58 +55,58 @@
                [[3 "9FyYzf9pum6E4"] [0 "0"] \r]
                [[4 "NwudSBdQg3Ru2"] [3 "9FyYzf9pum6E4"] \space]
                [[4 "9FyYzf9pum6E4"] [0 "0"] \d]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "xT_odlTBwTRNU"] [0 "0"] \space]
                [[2 "xT_odlTBwTRNU"] [0 "0"] \b]
                [[2 "NwudSBdQg3Ru2"] [1 "xT_odlTBwTRNU"] \q]
                [[2 "9FyYzf9pum6E4"] [1 "xT_odlTBwTRNU"] \space]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "Pz8iuNCXvVsYN"] [0 "0"] \o]
                [[2 "Pz8iuNCXvVsYN"] [1 "Pz8iuNCXvVsYN"] ::s/delete]
                [[3 "9FyYzf9pum6E4"] [2 "Pz8iuNCXvVsYN"] \u]
                [[2 "NwudSBdQg3Ru2"] [1 "Pz8iuNCXvVsYN"] \space]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \j]
                [[1 "VdIJLRISw~zgo"] [0 "0"] \w]
                [[1 "A~iIXinAXkGX7"] [0 "0"] ::s/delete]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \u]
                [[2 "W7XhooU1Hsw7E"] [1 "W7XhooU1Hsw7E"] \space]
                [[2 "7hLbMKLvcll_4"] [1 "W7XhooU1Hsw7E"] ::s/delete]
                [[1 "VdIJLRISw~zgo"] [0 "0"] \m]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "Ftbpo0oG7ZnpR"] [0 "0"] ::s/delete]
                [[1 "A~iIXinAXkGX7"] [0 "0"] ::s/delete]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 "VdIJLRISw~zgo"] [0 "0"] ::s/delete]
                [[2 "A~iIXinAXkGX7"] [1 "VdIJLRISw~zgo"] "j"]
                [[3 "A~iIXinAXkGX7"] [0 "0"] "i"]
                [[1 "W7XhooU1Hsw7E"] [0 "0"] "s"]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 " f "] [0 "0"] ::s/delete]
                [[2 " z "] [1 " f "] " "]
                [[2 " f "] [0 "0"] "l"]
                [[2 " a "] [1 " f "] "v"]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct))
   (let [nodes [[[1 " f "] [0 "0"] ::s/delete]
                [[2 " f "] [0 "0"] ::s/delete]
                [[3 " a "] [2 " f "] "c"]
                [[2 " z "] [1 " f "] "r"]]
-        ct (reduce c/insert (c/new-causal-tree ::s/list) nodes)]
+        ct (reduce c/insert (c/new-causal-tree :list) nodes)]
     (idempotent? ct)))
 
 (defn find-weave-inconsistencies
   ([] (find-weave-inconsistencies 9))
   ([max-steps]
-   (loop [ct (c/new-causal-tree ::s/list)
+   (loop [ct (c/new-causal-tree :list)
           insertions (::s/weave ct)
           step 0]
      (if (>= step max-steps)
@@ -143,7 +143,7 @@ respecting it." #" "))
   ([] (rand-weave-of-phrases 3))
   ([n-phrases]
    (let [starting-phrases (map #(str " <" % "> ") (repeatedly n-phrases rand-phrase))]
-     (loop [ct (c/new-causal-tree ::s/list)
+     (loop [ct (c/new-causal-tree :list)
             insertions []
             phrase (first starting-phrases)
             phrases (rest starting-phrases)
@@ -198,7 +198,7 @@ respecting it." #" "))
 
 (comment
   (do
-    (def tct (atom (c/new-causal-tree ::s/list)))
+    (def tct (atom (c/new-causal-tree :list)))
     (do (time (swap! tct insert-rand-node)) nil)
     (swap! tct c/insert (rand-node @tct (::s/site-id @tct) :yolo))
     (time (do (doall (repeatedly 50 #(swap! tct insert-rand-node))) nil))
@@ -227,7 +227,7 @@ respecting it." #" "))
 
 (comment
   (do
-    (def ct (atom (c/new-causal-tree ::s/list)))
+    (def ct (atom (c/new-causal-tree :list)))
 
     (u/insert [[1 1] [2 2] [4 4]] [3 3])
 
