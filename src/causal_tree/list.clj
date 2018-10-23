@@ -126,14 +126,6 @@
        (s/refresh-ts)
        (weave)))
 
-(defn yarns->nodes
-  "Replaces the ::s/nodes map of tree with the nodes in the tree's ::s/yarns."
-  [causal-tree]
-  (->> (::s/yarns causal-tree)
-       (reduce #(concat %1 (second %2)) [])
-       (reduce #(assoc %1 (first %2) (rest %2)) {})
-       (assoc causal-tree ::s/nodes)))
-
 (defn weft
   "Returns a causal-tree that is a sub tree of the original up to the
   specified Ids. Specify one specific ::s/id per site you want included
@@ -157,7 +149,7 @@
         (-> new-ct
             (assoc ::s/site-id (::s/site-id causal-tree))
             (assoc ::s/lamport-ts (apply max (pmap first filtered-ids)))
-            (yarns->nodes)
+            (s/yarns->nodes)
             (weave))))))
 
 ; TODO: should this take whole trees or a tree and nodes?

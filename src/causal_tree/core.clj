@@ -42,12 +42,10 @@
 (defn refresh-caches [causal-tree & args]
   (case (::s/type causal-tree)
     ::s/list (apply ct-list/refresh-caches causal-tree args)
+    ::s/map (apply ct-map/refresh-caches causal-tree args)
     causal-tree))
 
-(defn yarns->nodes [causal-tree & args]
-  (case (::s/type causal-tree)
-    ::s/list (apply ct-list/yarns->nodes causal-tree args)
-    causal-tree))
+(def yarns->nodes s/yarns->nodes)
 
 (defn weft [causal-tree & args]
   (case (::s/type causal-tree)

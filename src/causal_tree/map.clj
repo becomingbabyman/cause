@@ -87,3 +87,12 @@
                acc
                (assoc acc k v)))
            {} (::s/weave causal-tree))))
+
+(defn refresh-caches
+  "Replaces everything but ::s/nodes and ::s/site-id with refreshed caches
+   of ::s/weave ::s/yarns etc. Useful when loading in ::s/nodes."
+  [causal-tree]
+  (->> causal-tree
+       (s/spin)
+       (s/refresh-ts)
+       (weave)))

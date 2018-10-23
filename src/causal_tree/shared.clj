@@ -105,3 +105,11 @@
   (->> (::yarns causal-tree)
        (reduce #(max %1 (ffirst (last (last %2)))) 0)
        (assoc causal-tree ::lamport-ts)))
+
+(defn yarns->nodes
+  "Replaces the ::nodes map of tree with the nodes in the tree's ::yarns."
+  [causal-tree]
+  (->> (::yarns causal-tree)
+       (reduce #(concat %1 (second %2)) [])
+       (reduce #(assoc %1 (first %2) (rest %2)) {})
+       (assoc causal-tree ::nodes)))
