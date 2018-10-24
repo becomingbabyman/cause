@@ -21,16 +21,16 @@
     ::s/map (apply ct-map/weave causal-tree args)
     causal-tree))
 
-(defn insert [causal-tree & args]
+(defn insert [causal-tree node]
   (case (::s/type causal-tree)
-    ::s/list (apply ct-list/insert causal-tree args)
-    ::s/map (apply ct-map/insert causal-tree args)
+    ::s/list (s/insert causal-tree node ct-list/weave)
+    ::s/map (s/insert causal-tree node ct-map/weave)
     causal-tree))
 
-(defn append [causal-tree & args]
+(defn append [causal-tree cause value]
   (case (::s/type causal-tree)
-    ::s/list (apply ct-list/append causal-tree args)
-    ::s/map (apply ct-map/append causal-tree args)
+    ::s/list (s/append causal-tree cause value ct-list/weave)
+    ::s/map (s/append causal-tree cause value ct-map/weave)
     causal-tree))
 
 (defn materialize [causal-tree & args]
@@ -41,15 +41,16 @@
 
 (defn refresh-caches [causal-tree & args]
   (case (::s/type causal-tree)
-    ::s/list (apply ct-list/refresh-caches causal-tree args)
-    ::s/map (apply ct-map/refresh-caches causal-tree args)
+    ::s/list (s/refresh-caches causal-tree ct-list/weave)
+    ::s/map (s/refresh-caches causal-tree ct-map/weave)
     causal-tree))
 
 (def yarns->nodes s/yarns->nodes)
 
-(defn weft [causal-tree & args]
+(defn weft [causal-tree initial-ids]
   (case (::s/type causal-tree)
-    ::s/list (apply ct-list/weft causal-tree args)
+    ::s/list (s/refresh-caches causal-tree initial-ids ct-list/new-causal-tree ct-list/weave)
+    ::s/map (s/refresh-caches causal-tree initial-ids ct-map/new-causal-tree ct-map/weave)
     causal-tree))
 
 (defn merge-trees [causal-tree & args]

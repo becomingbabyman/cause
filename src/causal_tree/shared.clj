@@ -38,8 +38,11 @@
 (spec/def ::cause (spec/or :previous-list-item ::id
                            :map-key ::key))
 (spec/def ::value (spec/or :special-k speical-keywords
+                           :c char?
+                           :s string?
                            :k keyword?
-                           :c char?))
+                           :n number?
+                           :ct ::causal-tree))
 
 ; AKA an atom in CT parlance.
 (spec/def ::node (spec/cat :id ::id
@@ -98,6 +101,38 @@
          (update-in causal-tree [::yarns site-id] u/insert node)) ; u/insert is expensive. Avoid it.
        (assoc-in causal-tree [::yarns site-id] [node])))))
 
+(defn insert
+  "Inserts an arbitrary node from any site and any point in time. If the
+  node's ts is greater than the local ts then the local ts will be
+  fastforwared to match."
+  [causal-tree node weave-fn]
+  (if-let [existing-node-body (get-in causal-tree [::nodes (first node)])]
+    (if (= (rest node) existing-node-body)
+      causal-tree
+      (throw (ex-info "This node is already in the tree and can't be changed."
+                      {:causes #{:append-only :edits-not-allowed}
+                       :existing-node (cons (first node) existing-node-body)})))
+    (if (and (not (spec/valid? ::key (second node))) ; if the cause is a ::key we can ignore this check
+             (not (get-in causal-tree [::nodes (second node)])))
+      ; TODO: is this needed? parallel adjacent inserts might be possible without this.
+      (throw (ex-info "The cause of this node is not in the tree."
+                      {:causes #{:cause-must-exist}}))
+      (let [ct2 (if (> (ffirst node) (::lamport-ts causal-tree))
+                  (assoc-in causal-tree [::lamport-ts] (ffirst node))
+                  causal-tree)
+            ct3 (assoc-in ct2 [::nodes (first node)] (rest node))
+            ct4 (spin ct3 node)
+            ct5 (weave-fn ct4 node)]
+        ct5))))
+
+(defn append
+  "Similar to insert, but automatically calculates node id based on the
+  local site-id and lamport-ts."
+  [causal-tree cause value weave-fn]
+  (let [ct2 (update-in causal-tree [::lamport-ts] inc)
+        node (node (::lamport-ts ct2) (::site-id ct2) cause value)]
+    (insert ct2 node weave-fn)))
+
 (defn refresh-ts
   "Refreshes the ::lamport-ts to make sure it's the max value in the tree.
   Expects ::yarns cache to be up to date and sorted."
@@ -113,3 +148,38 @@
        (reduce #(concat %1 (second %2)) [])
        (reduce #(assoc %1 (first %2) (rest %2)) {})
        (assoc causal-tree ::nodes)))
+
+(defn refresh-caches
+  "Replaces everything but ::nodes and ::site-id with refreshed caches
+   of ::weave ::yarns etc. Useful when loading in ::nodes."
+  [causal-tree weave-fn]
+  (->> causal-tree
+       (spin)
+       (refresh-ts)
+       (weave-fn)))
+
+(defn weft
+  "Returns a causal-tree that is a sub tree of the original up to the
+  specified Ids. Specify one specific ::id per site you want included
+  in the weft. Only the yarns of the site-ids contained in the ids in
+  the args will be considered in the returned sub-tree. This is how
+  you time travel. Combinations of Ids that do not preserve causality
+  are invalid and will result in gibberish trees."
+  ; TODO: throw on ids that do not preserve causality. This likely invloves writing a O(n) un-weave function that can rollback a weave to the specified weft and throw if the rollback breaks causality...
+  [causal-tree initial-ids new-causal-tree-fn weave-fn]
+  (let [filtered-ids (filter #(not= root-id %) initial-ids)]
+    (loop [new-ct (new-causal-tree-fn)
+           id (first filtered-ids)
+           more-ids (rest filtered-ids)]
+      (if id
+        (recur (as-> (get-in causal-tree [::yarns (second id)]) $
+                     (take-while #(not= id (first %)) $)
+                     (vec $)
+                     (conj $ (node [id (get-in causal-tree [::nodes id])]))
+                     (assoc-in new-ct [::yarns (second id)] $))
+               (first more-ids) (rest more-ids))
+        (-> new-ct
+            (assoc ::site-id (::site-id causal-tree))
+            (assoc ::lamport-ts (apply max (pmap first filtered-ids)))
+            (yarns->nodes)
+            (weave-fn))))))

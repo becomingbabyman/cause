@@ -69,37 +69,6 @@
                                                             (first nl) true)
                                                      seen-since-asap))))))))
 
-(defn insert
-  "Inserts an arbitrary node from any site and any point in time. If the
-  node's ts is greater than the local ts then the local ts will be
-  fastforwared to match."
-  [causal-tree node]
-  (if-let [existing-node-body (get-in causal-tree [::s/nodes (first node)])]
-    (if (= (rest node) existing-node-body)
-      causal-tree
-      (throw (ex-info "This node is already in the tree and can't be changed."
-                      {:causes #{:append-only :edits-not-allowed}
-                       :existing-node (cons (first node) existing-node-body)})))
-    (if (not (get-in causal-tree [::s/nodes (second node)]))
-      ; TODO: is this needed? parallel adjacent inserts might be possible without this.
-      (throw (ex-info "The cause of this node is not in the tree."
-                      {:causes #{:cause-must-exist}}))
-      (let [ct2 (if (> (ffirst node) (::s/lamport-ts causal-tree))
-                  (assoc-in causal-tree [::s/lamport-ts] (ffirst node))
-                  causal-tree)
-            ct3 (assoc-in ct2 [::s/nodes (first node)] (rest node))
-            ct4 (s/spin ct3 node)
-            ct5 (weave ct4 node)]
-        ct5))))
-
-(defn append
-  "Similar to insert, but automatically calculates node id based on the
-  local site-id and lamport-ts."
-  [causal-tree value cause]
-  (let [ct2 (update-in causal-tree [::s/lamport-ts] inc)
-        node (s/node (::s/lamport-ts ct2) (::s/site-id ct2) cause value)]
-    (insert ct2 node)))
-
 ; TODO: rename to ct->edn
 (defn materialize
   "Returns the current state of the tree as edn. E.g. a tree of chars
@@ -116,41 +85,6 @@
      (and (= ::s/delete (last nr)) ; If the next node is a delete
           (= (first nm) (second nr))) nil ; and it deletes this node, return nil
      :else (last nm)))) ; Return the value.
-
-(defn refresh-caches
-  "Replaces everything but ::s/nodes and ::s/site-id with refreshed caches
-   of ::s/weave ::s/yarns etc. Useful when loading in ::s/nodes."
-  [causal-tree]
-  (->> causal-tree
-       (s/spin)
-       (s/refresh-ts)
-       (weave)))
-
-(defn weft
-  "Returns a causal-tree that is a sub tree of the original up to the
-  specified Ids. Specify one specific ::s/id per site you want included
-  in the weft. Only the yarns of the site-ids contained in the ids in
-  the args will be considered in the returned sub-tree. This is how
-  you time travel. Combinations of Ids that do not preserve causality
-  are invalid and will result in gibberish trees."
-  ; TODO: throw on ids that do not preserve causality. This likely invloves writing a O(n) un-weave function that can rollback a weave to the specified weft and throw if the rollback breaks causality...
-  [causal-tree initial-ids]
-  (let [filtered-ids (filter #(not= s/root-id %) initial-ids)]
-    (loop [new-ct (new-causal-tree)
-           id (first filtered-ids)
-           more-ids (rest filtered-ids)]
-      (if id
-        (recur (as-> (get-in causal-tree [::s/yarns (second id)]) $
-                     (take-while #(not= id (first %)) $)
-                     (vec $)
-                     (conj $ (s/node [id (get-in causal-tree [::s/nodes id])]))
-                     (assoc-in new-ct [::s/yarns (second id)] $))
-               (first more-ids) (rest more-ids))
-        (-> new-ct
-            (assoc ::s/site-id (::s/site-id causal-tree))
-            (assoc ::s/lamport-ts (apply max (pmap first filtered-ids)))
-            (s/yarns->nodes)
-            (weave))))))
 
 ; TODO: should this take whole trees or a tree and nodes?
 ;   Nodes are simpler, can be sorted, and merged in with O(n*m)

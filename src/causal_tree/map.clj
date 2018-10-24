@@ -35,44 +35,17 @@
                      (vec (concat left [[id v]] right)))
            (recur (conj left nr) (rest right))))))))
 
-(defn insert
-  "Inserts an arbitrary node from any site and any point in time. If the
-  node's ts is greater than the local ts then the local ts will be
-  fastforwared to match."
-  [causal-tree node]
-  (if-let [existing-node-body (get-in causal-tree [::s/nodes (first node)])]
-    (if (= (rest node) existing-node-body)
-      causal-tree
-      (throw (ex-info "This node is already in the tree and can't be changed."
-                      {:causes #{:append-only :edits-not-allowed}
-                       :existing-node (cons (first node) existing-node-body)})))
-    (let [ct2 (if (> (ffirst node) (::s/lamport-ts causal-tree))
-                (assoc-in causal-tree [::s/lamport-ts] (ffirst node))
-                causal-tree)
-          ct3 (assoc-in ct2 [::s/nodes (first node)] (rest node))
-          ct4 (s/spin ct3 node)
-          ct5 (weave ct4 node)]
-      ct5)))
-
-(defn append
-  "Similar to insert, but automatically calculates node id based on the
-  local site-id and lamport-ts."
-  [causal-tree k v]
-  (let [ct2 (update-in causal-tree [::s/lamport-ts] inc)
-        node (s/node (::s/lamport-ts ct2) (::s/site-id ct2) k v)]
-    (insert ct2 node)))
-
 (defn assoc-
   ([causal-tree k v]
    ; TODO: check that k is not already set to v before appending new node
-   (append causal-tree k v))
+   (s/append causal-tree k v weave))
   ([causal-tree k v & kvs]
    (apply assoc- (assoc- k v) kvs)))
 
 (defn dissoc-
   ([causal-tree k]
    ; TODO: check that k exists and is not currently deleted before appending a new delete
-   (append causal-tree k ::s/delete))
+   (s/append causal-tree k ::s/delete weave))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- k) ks)))
 
@@ -87,12 +60,3 @@
                acc
                (assoc acc k v)))
            {} (::s/weave causal-tree))))
-
-(defn refresh-caches
-  "Replaces everything but ::s/nodes and ::s/site-id with refreshed caches
-   of ::s/weave ::s/yarns etc. Useful when loading in ::s/nodes."
-  [causal-tree]
-  (->> causal-tree
-       (s/spin)
-       (s/refresh-ts)
-       (weave)))
