@@ -85,15 +85,3 @@
      (and (= ::s/delete (last nr)) ; If the next node is a delete
           (= (first nm) (second nr))) nil ; and it deletes this node, return nil
      :else (last nm)))) ; Return the value.
-
-; TODO: should this take whole trees or a tree and nodes?
-;   Nodes are simpler, can be sorted, and merged in with O(n*m)
-;   m being the number of nodes in the merge. It's likely that
-;   there will be duplicate nodes either way, so a diff will
-;   always need to be calculated...
-(defn merge-trees
-  "Merges two or more causal-trees into one."
-  ([causal-tree1 causal-tree2 & more]
-   (apply merge-trees (merge-trees causal-tree1 causal-tree2) more))
-  ([causal-tree1 causal-tree2]
-   (println "TODO")))

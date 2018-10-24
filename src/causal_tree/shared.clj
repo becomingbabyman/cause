@@ -183,3 +183,17 @@
             (assoc ::lamport-ts (apply max (pmap first filtered-ids)))
             (yarns->nodes)
             (weave-fn))))))
+
+; TODO: should this take whole trees or a tree and nodes?
+;   Nodes are simpler, can be sorted, and merged in with O(n*m)
+;   m being the number of nodes in the merge. It's likely that
+;   there will be duplicate nodes either way, so a diff will
+;   always need to be calculated...
+(defn merge-trees
+  "Merges two or more causal-trees into one."
+  ([weave-fn causal-tree1 causal-tree2 & more]
+   (apply merge-trees weave-fn
+          (merge-trees weave-fn causal-tree1 causal-tree2)
+          more))
+  ([weave-fn causal-tree1 causal-tree2]
+   (println "TODO")))

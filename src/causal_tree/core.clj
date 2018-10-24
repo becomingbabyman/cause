@@ -53,10 +53,11 @@
     ::s/map (s/refresh-caches causal-tree initial-ids ct-map/new-causal-tree ct-map/weave)
     causal-tree))
 
-(defn merge-trees [causal-tree & args]
-  (case (::s/type causal-tree)
-    ::s/list (apply ct-list/merge-trees causal-tree args)
-    causal-tree))
+(defn merge-trees [causal-tree1 & args]
+  (case (::s/type causal-tree1)
+    ::s/list (s/merge-trees ct-list/weave causal-tree1 args)
+    ::s/map (s/merge-trees ct-map/weave causal-tree1 args)
+    nil))
 
 ;; Specialty helper functions
 (defn assoc [causal-tree & args]
