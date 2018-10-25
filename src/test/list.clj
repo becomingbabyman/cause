@@ -200,6 +200,8 @@ respecting it." #" "))
   (do
     (def tct (atom (c/new-causal-tree :list)))
     (do (time (swap! tct insert-rand-node)) nil)
+    (swap! tct c/conj "h" "e" "l" "l" "o")
+    (c/materialize (c/cons "! " @tct))
     (swap! tct c/insert (rand-node @tct (::s/site-id @tct) :yolo))
     (time (do (doall (repeatedly 50 #(swap! tct insert-rand-node))) nil))
     (time (clojure.pprint/pprint (c/materialize @tct)))

@@ -59,13 +59,24 @@
     ::s/map (s/merge-trees ct-map/weave causal-tree1 args)
     nil))
 
-;; Specialty helper functions
-(defn assoc [causal-tree & args]
+; Specialty helper functions
+
+(defn assoc [causal-tree & kvs]
   (case (::s/type causal-tree)
-    ::s/map (apply ct-map/assoc- causal-tree args)
+    ::s/map (apply ct-map/assoc- causal-tree kvs)
     causal-tree))
 
-(defn dissoc [causal-tree & args]
+(defn dissoc [causal-tree & ks]
   (case (::s/type causal-tree)
-    ::s/map (apply ct-map/dissoc- causal-tree args)
+    ::s/map (apply ct-map/dissoc- causal-tree ks)
+    causal-tree))
+
+(defn conj [causal-tree & vs]
+  (case (::s/type causal-tree)
+    ::s/list (apply ct-list/conj- causal-tree vs)
+    causal-tree))
+
+(defn cons [v causal-tree]
+  (case (::s/type causal-tree)
+    ::s/list (ct-list/cons- v causal-tree)
     causal-tree))

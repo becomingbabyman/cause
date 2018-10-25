@@ -85,3 +85,14 @@
      (and (= ::s/delete (last nr)) ; If the next node is a delete
           (= (first nm) (second nr))) nil ; and it deletes this node, return nil
      :else (last nm)))) ; Return the value.
+
+; Specialty helper functions
+
+(defn conj-
+  ([causal-tree v & vs]
+   (apply conj- (conj- causal-tree v) vs))
+  ([causal-tree v]
+   (s/append causal-tree (first (last (::s/weave causal-tree))) v weave)))
+
+(defn cons- [v causal-tree]
+  (s/append causal-tree s/root-id v weave))

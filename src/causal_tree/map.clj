@@ -35,6 +35,20 @@
                      (vec (concat left [[id v]] right)))
            (recur (conj left nr) (rest right))))))))
 
+; TODO: rename to ct->edn
+(defn materialize
+  "Returns the current state of the tree as edn. E.g. a tree of ks & vs
+  will materialize as a map. This is mostly for testing and pretty
+  printing. In most cases it's prefferable to work with the whole tree."
+  ([causal-tree]
+   (reduce (fn [acc [k [[_ v]]]]
+             (if (= v ::s/delete)
+               acc
+               (assoc acc k v)))
+           {} (::s/weave causal-tree))))
+
+; Specialty helper functions
+
 (defn assoc-
   ([causal-tree k v]
    ; TODO: check that k is not already set to v before appending new node
@@ -48,15 +62,3 @@
    (s/append causal-tree k ::s/delete weave))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- k) ks)))
-
-; TODO: rename to ct->edn
-(defn materialize
-  "Returns the current state of the tree as edn. E.g. a tree of ks & vs
-  will materialize as a map. This is mostly for testing and pretty
-  printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree]
-   (reduce (fn [acc [k [[_ v]]]]
-             (if (= v ::s/delete)
-               acc
-               (assoc acc k v)))
-           {} (::s/weave causal-tree))))
