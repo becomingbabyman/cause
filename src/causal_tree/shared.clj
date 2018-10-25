@@ -117,13 +117,12 @@
       ; TODO: is this needed? parallel adjacent inserts might be possible without this.
       (throw (ex-info "The cause of this node is not in the tree."
                       {:causes #{:cause-must-exist}}))
-      (let [ct2 (if (> (ffirst node) (::lamport-ts causal-tree))
-                  (assoc-in causal-tree [::lamport-ts] (ffirst node))
-                  causal-tree)
-            ct3 (assoc-in ct2 [::nodes (first node)] (rest node))
-            ct4 (spin ct3 node)
-            ct5 (weave-fn ct4 node)]
-        ct5))))
+      (-> (if (> (ffirst node) (::lamport-ts causal-tree))
+            (assoc-in causal-tree [::lamport-ts] (ffirst node))
+            causal-tree)
+          (assoc-in [::nodes (first node)] (rest node))
+          (spin node)
+          (weave-fn node)))))
 
 (defn append
   "Similar to insert, but automatically calculates node id based on the
