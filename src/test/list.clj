@@ -116,8 +116,8 @@
            (recur (c/insert ct node) (conj insertions node) (inc step)))
          {:insertions insertions
           :step step
-          :initial (c/materialize ct)
-          :reweave (c/materialize (c/weave ct))})))))
+          :initial (c/ct->edn ct)
+          :reweave (c/ct->edn (c/weave ct))})))))
 
 (comment
   (known-idempotent-insert-edge-cases)
@@ -161,8 +161,8 @@ respecting it." #" "))
          {:ct ct
           :insertions insertions
           :phrases starting-phrases
-          :materialized-weave (c/materialize ct)
-          :materialized-reweave (c/materialize (c/weave ct))})))))
+          :materialized-weave (c/ct->edn ct)
+          :materialized-reweave (c/ct->edn (c/weave ct))})))))
 
 (deftest concurrent-runs-stick-together
   (let [result (rand-weave-of-phrases 5)]
@@ -201,16 +201,16 @@ respecting it." #" "))
     (def tct (atom (c/new-causal-tree :list)))
     (do (time (swap! tct insert-rand-node)) nil)
     (swap! tct c/conj "h" "e" "l" "l" "o")
-    (c/materialize (c/cons "! " @tct))
+    (c/ct->edn (c/cons "! " @tct))
     (swap! tct c/insert (rand-node @tct (::s/site-id @tct) :yolo))
     (time (do (doall (repeatedly 50 #(swap! tct insert-rand-node))) nil))
-    (time (clojure.pprint/pprint (c/materialize @tct)))
+    (time (clojure.pprint/pprint (c/ct->edn @tct)))
     (count (::s/nodes @tct))
     (idempotent? @tct)
     (deref tct)
     (clojure.pprint/pprint [(::s/weave @tct) (::s/weave (c/refresh-caches @tct))]))
   (quick-bench (do (doall (repeatedly 10000 #(insert-rand-node @tct))) nil))
-  (quick-bench (do (c/materialize @tct) nil)))
+  (quick-bench (do (c/ct->edn @tct) nil)))
 
 (comment
   (spec/valid? ::s/lamport-ts 0)
@@ -255,11 +255,11 @@ respecting it." #" "))
     (swap! ct c/append \k (first test-node))
     (swap! ct c/append ::s/delete (first test-node))
 
-    (c/materialize @ct)
+    (c/ct->edn @ct)
 
     (def some-weft-ids (map (comp first last last) (::s/yarns @ct)))
     (c/weft @ct some-weft-ids)
-    ; (c/materialize (c/weft @ct [[0 "0"]
+    ; (c/ct->edn (c/weft @ct [[0 "0"]
     ;                             [1 "SoEKxJ2JiC5dY"]
     ;                             [2 "81KYDSlVWQD0~"]
     ;                             [3 "rTCvwmeN3eRbJ"]
@@ -323,8 +323,8 @@ respecting it." #" "))
       (swap! ct c/insert n10b)
       (swap! ct c/insert n11b))
 
-    (c/materialize @ct)
-    (c/materialize (c/weave @ct))
+    (c/ct->edn @ct)
+    (c/ct->edn (c/weave @ct))
     ; (swap! ct weave)
     ; (dspec/view (::weave @ct))
     (deref ct)))

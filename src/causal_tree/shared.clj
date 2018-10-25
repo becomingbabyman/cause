@@ -183,6 +183,44 @@
             (yarns->nodes)
             (weave-fn))))))
 
+(declare ct->edn)
+
+(defn ct-map->edn
+  "Returns the current state of the tree as edn. E.g. a tree of ks & vs
+  will materialize as a map. This is mostly for testing and pretty
+  printing. In most cases it's prefferable to work with the whole tree."
+  ([causal-tree]
+   (reduce (fn [acc [k [[_ v]]]]
+             (if (= v ::delete)
+               acc
+               (assoc acc k (ct->edn v))))
+           {} (::weave causal-tree))))
+
+(defn ct-list->edn
+  "Returns the current state of the tree as edn. E.g. a tree of chars
+  will materialize as a string. This is mostly for testing and pretty
+  printing. In most cases it's prefferable to work with the whole tree."
+  ([causal-tree]
+   (->> (::weave causal-tree)
+        (partition 3 1 nil)
+        (keep (partial ct-list->edn causal-tree))))
+        ; (apply str)))
+  ([causal-tree [nl nm nr]]
+   (cond
+     (= ::delete (last nm)) nil ; Don't return deletes.
+     (and (= ::delete (last nr)) ; If the next node is a delete
+          (= (first nm) (second nr))) nil ; and it deletes this node, return nil
+     :else (ct->edn (last nm))))) ; Return the value.
+
+(defn ct->edn
+  "Takes a value. If it's a causal tree it returns the data representing the
+  current state of the tree. If it's not a causal tree it just returns the value."
+  [causal-tree-or-any-value]
+  (case (::type causal-tree-or-any-value)
+    nil causal-tree-or-any-value
+    ::map (ct-map->edn causal-tree-or-any-value)
+    ::list (ct-list->edn causal-tree-or-any-value)))
+
 ; TODO: should this take whole trees or a tree and nodes?
 ;   Nodes are simpler, can be sorted, and merged in with O(n*m)
 ;   m being the number of nodes in the merge. It's likely that

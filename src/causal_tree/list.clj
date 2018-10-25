@@ -69,23 +69,6 @@
                                                             (first nl) true)
                                                      seen-since-asap))))))))
 
-; TODO: rename to ct->edn
-(defn materialize
-  "Returns the current state of the tree as edn. E.g. a tree of chars
-  will materialize as a string. This is mostly for testing and pretty
-  printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree]
-   (->> (::s/weave causal-tree)
-        (partition 3 1 nil)
-        (keep (partial materialize causal-tree))
-        (apply str)))
-  ([causal-tree [nl nm nr]]
-   (cond
-     (= ::s/delete (last nm)) nil ; Don't return deletes.
-     (and (= ::s/delete (last nr)) ; If the next node is a delete
-          (= (first nm) (second nr))) nil ; and it deletes this node, return nil
-     :else (last nm)))) ; Return the value.
-
 ; Specialty helper functions
 
 (defn conj-

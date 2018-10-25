@@ -33,12 +33,6 @@
     ::s/map (s/append causal-tree cause value ct-map/weave)
     causal-tree))
 
-(defn materialize [causal-tree & args]
-  (case (::s/type causal-tree)
-    ::s/list (apply ct-list/materialize causal-tree args)
-    ::s/map (apply ct-map/materialize causal-tree args)
-    nil))
-
 (defn refresh-caches [causal-tree & args]
   (case (::s/type causal-tree)
     ::s/list (s/refresh-caches causal-tree ct-list/weave)
@@ -52,6 +46,8 @@
     ::s/list (s/refresh-caches causal-tree initial-ids ct-list/new-causal-tree ct-list/weave)
     ::s/map (s/refresh-caches causal-tree initial-ids ct-map/new-causal-tree ct-map/weave)
     causal-tree))
+
+(def ct->edn s/ct->edn)
 
 (defn merge-trees [causal-tree1 & args]
   (case (::s/type causal-tree1)
