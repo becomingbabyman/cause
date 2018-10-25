@@ -33,7 +33,7 @@
     ::s/map (s/append causal-tree cause value ct-map/weave)
     causal-tree))
 
-(defn refresh-caches [causal-tree & args]
+(defn refresh-caches [causal-tree]
   (case (::s/type causal-tree)
     ::s/list (s/refresh-caches causal-tree ct-list/weave)
     ::s/map (s/refresh-caches causal-tree ct-map/weave)
