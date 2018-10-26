@@ -5,7 +5,8 @@
    [causal-tree.core :as c]
    [clojure.pprint :refer [pprint]]
    [clojure.string :as string]
-   [clojure.test :refer [deftest is]]))
+   [clojure.test :refer [deftest is]]
+   [com.walmartlabs.datascope :as ds]))
 
 (comment
   (pprint
@@ -22,10 +23,12 @@
   (swap! ct2 c/conj "a")
   (swap! ct2 c/conj "b")
   (swap! ct2 c/conj "c")
-  (pprint (swap! ct c/assoc :fizz @ct2))
+  ; (swap! ct2 c/conj @ct)
+  (pprint (swap! ct c/assoc :fizz ct2))
   (pprint (swap! ct c/dissoc :foo))
   (pprint (deref ct))
   (c/ct->edn @ct2)
   (swap! ct2 c/conj "d")
-  (c/ct->edn @ct)
+  (apply str (:fizz (c/ct->edn @ct)))
+  (ds/view @ct)
   (c/ct->edn @ct2))
