@@ -50,3 +50,7 @@
    (s/append causal-tree k ::s/delete weave))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- k) ks)))
+
+(defn get-
+  ([causal-tree k]
+   (last (first (get-in causal-tree [::s/weave k])))))

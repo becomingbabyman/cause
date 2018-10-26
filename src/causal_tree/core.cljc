@@ -76,3 +76,8 @@
   (case (::s/type causal-tree)
     ::s/list (ct-list/cons- v causal-tree)
     causal-tree))
+
+(defn get [causal-tree k]
+  (case (::s/type causal-tree)
+    ::s/map (ct-map/get- causal-tree k)
+    causal-tree))

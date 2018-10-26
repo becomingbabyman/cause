@@ -29,6 +29,7 @@
   (pprint (deref ct))
   (c/ct->edn @ct2)
   (swap! ct2 c/conj "d")
+  (swap! (c/get @ct :fizz) c/conj "e")
   (apply str (:fizz (c/ct->edn @ct)))
   (ds/view @ct)
   (c/ct->edn @ct2))
