@@ -12,10 +12,6 @@
    [criterium.core :refer [quick-bench]]
    [com.walmartlabs.datascope :as ds]))
 
-; TODO: move this a script that's loaded into the user ns on test start
-(require 'pjstadig.humane-test-output)
-(pjstadig.humane-test-output/activate!)
-
 (def simple-values
   (concat [::s/delete ::s/delete ::s/delete \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
@@ -161,8 +157,8 @@ respecting it." #" "))
          {:ct ct
           :insertions insertions
           :phrases starting-phrases
-          :materialized-weave (c/ct->edn ct)
-          :materialized-reweave (c/ct->edn (c/weave ct))})))))
+          :materialized-weave (apply str (c/ct->edn ct))
+          :materialized-reweave (apply str (c/ct->edn (c/weave ct)))})))))
 
 (deftest concurrent-runs-stick-together
   (let [result (rand-weave-of-phrases 5)]

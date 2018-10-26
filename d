@@ -1,1 +1,1 @@
-clj -A:dev:proto:nrepl:test
+clojure -A:dev:cljs:proto:nrepl:test:bench build.clj figwheel

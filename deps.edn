@@ -1,14 +1,16 @@
-; Copyright (c) Cognitect, Inc.
-;; All rights reserved.
-
-{:paths ["src" "resources"]
+{:paths ["src" "test" "dev" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.9.0"}
-        io.replikativ/hasch {:mvn/version "0.3.5"}
         nano-id {:mvn/version "0.9.3"}}
  :aliases
  {:dev {:extra-deps {walmartlabs/datascope {:mvn/version "0.1.1"}
-                     criterium {:mvn/version "0.4.4"}
                      com.taoensso/tufte {:mvn/version "2.0.1"}}}
+
+  ;; ClojureScript
+  :cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.9.946"}
+                      cider/piggieback {:mvn/version "0.3.10" :exclusions
+                                        [com.google.javascript/closure-compiler]}
+                      figwheel-sidecar {:mvn/version "0.5.15" :exclusions
+                                        [com.google.javascript/closure-compiler]}}}
 
   ;; pull in specific versions of Clojure:
   :1.2 {:override-deps {org.clojure/clojure {:mvn/version "1.2.1"}}}
@@ -47,7 +49,7 @@
 
   ;; REPL-related tools:
   ;; - start an nREPL server on port 60606:
-  :nrepl {:extra-deps {org.clojure/tools.nrepl {:mvn/version "0.2.12"}}
+  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "0.4.5"}}
           :main-opts ["-e" "(require,'[clojure.tools.nrepl.server,:refer,[start-server]]),(start-server,:port,60606)"]}
   ;; - start a Socket REPL on port 50505:
   :socket {:jvm-opts ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}
