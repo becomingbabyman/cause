@@ -1,4 +1,4 @@
-(ns test.list
+(ns test.causal-tree.list
   (:require
    [causal-tree.util :as u]
    [causal-tree.shared :as s]

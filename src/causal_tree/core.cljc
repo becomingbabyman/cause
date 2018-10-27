@@ -81,3 +81,10 @@
   (case (::s/type causal-tree)
     ::s/map (ct-map/get- causal-tree k)
     causal-tree))
+
+(defn first [causal-tree] (println "TODO"))
+(defn last [causal-tree] (println "TODO"))
+(defn next [causal-tree] (println "TODO"))
+(defn rest [causal-tree] (println "TODO"))
+(defn undo [causal-tree & site-id] (println "TODO"))
+(defn redo [causal-tree & site-id] (println "TODO"))
