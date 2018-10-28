@@ -1,2 +1,5 @@
 language: clojure
-script: lein doo phantom browser-test once
+env:
+  - TEST_SUITE=test
+  - TEST_SUITE="doo phantom browser-test once"
+script: "lein $TEST_SUITE"
