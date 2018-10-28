@@ -88,7 +88,7 @@
   entire tree will be traversed and (re)indexed."
   ([causal-tree]
    (loop [ct1 causal-tree
-          sorted-nodes (pmap node (sort (::nodes causal-tree)))]
+          sorted-nodes (map node (sort (::nodes causal-tree)))]
      (if (empty? sorted-nodes)
        ct1
        (recur (spin ct1 (first sorted-nodes))
@@ -179,7 +179,7 @@
                (first more-ids) (rest more-ids))
         (-> new-ct
             (assoc ::site-id (::site-id causal-tree))
-            (assoc ::lamport-ts (apply max (pmap first filtered-ids)))
+            (assoc ::lamport-ts (apply max (map first filtered-ids)))
             (yarns->nodes)
             (weave-fn))))))
 
@@ -217,7 +217,8 @@
   current state of the tree. If it's not a causal tree it just returns the value."
   [causal-tree-or-any-value]
   (case (::type causal-tree-or-any-value)
-    nil (if (= clojure.lang.Atom (type causal-tree-or-any-value))
+    nil (if (= (type causal-tree-or-any-value)
+               #? (:clj clojure.lang.Atom :cljs Atom))
           (ct->edn (deref causal-tree-or-any-value)) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
           causal-tree-or-any-value)
     ::map (ct-map->edn causal-tree-or-any-value)

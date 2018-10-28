@@ -7,6 +7,7 @@
 
             :dependencies [[org.clojure/clojure       "1.9.0" :scope "provided"]
                            [org.clojure/clojurescript "1.10.238" :scope "provided"]
+                           [org.clojure/core.async "0.4.474"]
                            [nano-id                   "0.9.3"]]
 
             :plugins [[lein-doo       "0.1.10"]
@@ -47,4 +48,16 @@
                :compiler {:main          causal-tree.runner
                           :output-to     "target/browser-tests.js"
                           :output-dir    "target"
-                          :optimizations :advanced}}]})
+                          :optimizations :advanced
+                          :parallel-build true}}
+              {:id "dev"
+               :figwheel {:open-urls ["http://localhost:3449"]}
+               :source-paths ["src"]
+               :compiler {:main causal-tree.core
+                          :asset-path "resources/public"
+                          :output-to "target/figwheel/main.js"
+                          :output-dir "target/figwheel/out"
+                          :verbose false
+                          :optimizations :none
+                          :cache-analysis true
+                          :source-map true}}]})

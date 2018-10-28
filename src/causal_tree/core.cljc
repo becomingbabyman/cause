@@ -43,8 +43,8 @@
 
 (defn weft [causal-tree initial-ids]
   (case (::s/type causal-tree)
-    ::s/list (s/refresh-caches causal-tree initial-ids ct-list/new-causal-tree ct-list/weave)
-    ::s/map (s/refresh-caches causal-tree initial-ids ct-map/new-causal-tree ct-map/weave)
+    ::s/list (s/weft causal-tree initial-ids ct-list/new-causal-tree ct-list/weave)
+    ::s/map (s/weft causal-tree initial-ids ct-map/new-causal-tree ct-map/weave)
     causal-tree))
 
 (def ct->edn s/ct->edn)
@@ -57,34 +57,34 @@
 
 ; Specialty helper functions
 
-(defn assoc [causal-tree & kvs]
+(defn assoc- [causal-tree & kvs]
   (case (::s/type causal-tree)
     ::s/map (apply ct-map/assoc- causal-tree kvs)
     causal-tree))
 
-(defn dissoc [causal-tree & ks]
+(defn dissoc- [causal-tree & ks]
   (case (::s/type causal-tree)
     ::s/map (apply ct-map/dissoc- causal-tree ks)
     causal-tree))
 
-(defn conj [causal-tree & vs]
+(defn conj- [causal-tree & vs]
   (case (::s/type causal-tree)
     ::s/list (apply ct-list/conj- causal-tree vs)
     causal-tree))
 
-(defn cons [v causal-tree]
+(defn cons- [v causal-tree]
   (case (::s/type causal-tree)
     ::s/list (ct-list/cons- v causal-tree)
     causal-tree))
 
-(defn get [causal-tree k]
+(defn get- [causal-tree k]
   (case (::s/type causal-tree)
     ::s/map (ct-map/get- causal-tree k)
     causal-tree))
 
-(defn first [causal-tree] (println "TODO"))
-(defn last [causal-tree] (println "TODO"))
-(defn next [causal-tree] (println "TODO"))
-(defn rest [causal-tree] (println "TODO"))
-(defn undo [causal-tree & site-id] (println "TODO"))
-(defn redo [causal-tree & site-id] (println "TODO"))
+(defn first- [causal-tree] (println "TODO"))
+(defn last- [causal-tree] (println "TODO"))
+(defn next- [causal-tree] (println "TODO"))
+(defn rest- [causal-tree] (println "TODO"))
+(defn undo- [causal-tree & site-id] (println "TODO"))
+(defn redo- [causal-tree & site-id] (println "TODO"))

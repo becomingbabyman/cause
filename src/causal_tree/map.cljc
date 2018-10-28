@@ -22,7 +22,7 @@
   infrequently changed."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave {})
-           (pmap s/node (sort (::s/nodes causal-tree)))))
+           (map s/node (sort (::s/nodes causal-tree)))))
   ([causal-tree [id k v :as node]]
    (if (not (get-in causal-tree [::s/nodes id]))
      causal-tree
@@ -42,14 +42,14 @@
    ; TODO: check that k is not already set to v before appending new node
    (s/append causal-tree k v weave))
   ([causal-tree k v & kvs]
-   (apply assoc- (assoc- k v) kvs)))
+   (apply assoc- (assoc- causal-tree k v) kvs)))
 
 (defn dissoc-
   ([causal-tree k]
    ; TODO: check that k exists and is not currently deleted before appending a new delete
    (s/append causal-tree k ::s/delete weave))
   ([causal-tree k & ks]
-   (apply dissoc- (dissoc- k) ks)))
+   (apply dissoc- (dissoc- causal-tree k) ks)))
 
 (defn get-
   ([causal-tree k]
