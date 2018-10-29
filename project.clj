@@ -5,14 +5,13 @@
             :license {:name "MIT License"
                       :url "https://opensource.org/licenses/MIT"}
 
-            :dependencies [[org.clojure/clojure       "1.9.0" :scope "provided"]
-                           [org.clojure/clojurescript "1.10.238" :scope "provided"]
+            :dependencies [[org.clojure/clojure "1.9.0" :scope "provided"]
+                           [org.clojure/clojurescript "1.10.339" :scope "provided"]
                            [org.clojure/core.async "0.4.474"]
-                           [nano-id                   "0.9.3"]]
+                           [nano-id "0.9.3"]]
 
-            :plugins [[lein-doo       "0.1.10"]
+            :plugins [[lein-doo "0.1.10"]
                       [lein-cljsbuild "1.1.7" :exclusions [[org.clojure/clojure]]]
-                      [nrepl/lein-nrepl "0.2.0"]
                       [lein-figwheel "0.5.17"]]
 
             :profiles
@@ -25,17 +24,17 @@
                              [com.taoensso/tufte "2.0.1"]
                              [criterium "0.4.4"]
                              [com.clojure-goes-fast/clj-memory-meter "0.1.2"]
-                             [nrepl/nrepl "0.4.5"]
+                             [org.clojure/tools.nrepl "0.2.13"]
                              [proto-repl "0.3.1"]
                              [figwheel-sidecar "0.5.16"]
                              [com.bhauman/rebel-readline "0.1.4"]
-                             [cider/piggieback "0.3.10"]]
-              :repl-options {:nrepl-middleware [cider.piggieback/wrap-cljs-repl]}}}
+                             [com.cemerick/piggieback "0.2.1"]]
+              :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}}}
 
             :doo {:alias {:browsers [:chrome :firefox]}}
 
-            :aliases {"deploy"    ["do" "clean," "deploy" "clojars"]
-                      "test"      ["do" ["clean"] ["test"]]
+            :aliases {"deploy" ["do" "clean," "deploy" "clojars"]
+                      "test" ["do" ["clean"] ["test"]]
                       "cljs-test" ["do" ["doo" "browsers" "browser-test" "once"]]
                       "cljs-test-watch" ["do" ["doo" "browsers" "browser-test" "auto"]]}
 
@@ -45,18 +44,18 @@
             {:builds
              [{:id "browser-test"
                :source-paths ["src" "test"]
-               :compiler {:main          causal-tree.runner
-                          :output-to     "target/browser-tests.js"
-                          :output-dir    "target"
+               :compiler {:main causal-tree.runner
+                          :output-to "target/browser-test/browser-test.js"
+                          :output-dir "target/browser-test/out"
                           :optimizations :advanced
                           :parallel-build true}}
               {:id "dev"
                :figwheel {:open-urls ["http://localhost:3449"]}
                :source-paths ["src"]
                :compiler {:main causal-tree.core
-                          :asset-path "resources/public"
-                          :output-to "target/figwheel/main.js"
-                          :output-dir "target/figwheel/out"
+                          :asset-path "js/out"
+                          :output-to "resources/public/js/main.js"
+                          :output-dir "resources/public/js/out"
                           :verbose false
                           :optimizations :none
                           :cache-analysis true

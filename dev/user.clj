@@ -4,11 +4,15 @@
 
 (pjstadig.humane-test-output/activate!)
 
-(defn start []
+(defn start-fw []
   (ra/start-figwheel!))
 
-(defn stop []
+(defn stop-fw []
   (ra/stop-figwheel!))
 
-(defn repl []
+(defn repl-cljs []
   (ra/cljs-repl))
+
+(defn cljs []
+  (start-fw)
+  (repl-cljs))

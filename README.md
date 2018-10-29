@@ -19,8 +19,11 @@ npm install
 lein cljs-test
 ```
 
-nREPL
+Dev REPL / nREPL
 
 ```
-lein nrepl
+lein repl
+
+user=> (cljs) ; to get a cljs repl
+cljs.user=> :cljs/quit ; to go back to clj repl
 ```
