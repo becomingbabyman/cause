@@ -10,19 +10,14 @@
   ([a b & more]
    (and (<< a b) (apply << b more))))
 
-(def site-id-length 13)
 (defn guid
   "Returns a globally unique ID, encoded to take up as little
-  space as possible. The default is a length of 13 characters
-  which copromises uniqueness for space savings given these ids
-  will be scoped to CRDTs that will likely never never exceed 1M
-  unique ids. Pass a length parameter if you expect to need more
-  uniqueness. See this site for help picking a reasonable
+  space as possible. See this site for help picking a reasonable
   length https://zelark.github.io/nano-id-cc/. The default for
   nano-id is 21 which maps similarly to the uniqueness of most uuid
   generators and is a good default if your scope is not bounded."
   ; TODO: consider the tradoffs of nano-id compared to a standard uuid implmentation https://www.itu.int/en/ITU-T/asn1/Pages/UUID/uuids.aspx
-  ([] (guid site-id-length))
+  ([] (nano-id))
   ([length] (nano-id length)))
 
 (defn sorted-insertion-index

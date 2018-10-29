@@ -1,21 +1,16 @@
 (ns causal-tree.list-test
   (:require
-   [causal-tree.util :as u]
    [causal-tree.shared :as s]
    [causal-tree.core :as c]
-   [clojure.pprint :refer [pprint]]
    [clojure.string :as string]
    [clojure.test :refer [deftest is]]
-   [clojure.spec.alpha :as spec]
-   [clojure.spec.gen.alpha :as gen]
-   [clojure.spec.test.alpha :as stest]
    #? (:clj [criterium.core :refer [quick-bench]])))
 
 (def simple-values
   (concat [::s/delete ::s/delete ::s/delete \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
 ; (def site-ids [0 1 2])
-(def site-ids [(u/guid) (u/guid) (u/guid) (u/guid) (u/guid)])
+(def site-ids [(s/site-id) (s/site-id) (s/site-id) (s/site-id) (s/site-id)])
 
 (defn rand-node
   ([causal-tree] (rand-node causal-tree (rand-nth site-ids)))
@@ -136,7 +131,7 @@ respecting it." #" "))
             insertions []
             phrase (first starting-phrases)
             phrases (rest starting-phrases)
-            site-id (u/guid)]
+            site-id (s/site-id)]
        (if (not-empty phrase)
          (let [cause (last (get-in ct [::s/yarns site-id]))
                node  (c/node (inc (or (ffirst cause) 1)) site-id
@@ -146,7 +141,7 @@ respecting it." #" "))
                   (conj insertions node)
                   (if (not-empty (rest phrase)) (rest phrase) (first phrases))
                   (if (not-empty (rest phrase)) phrases (rest phrases))
-                  (if (not-empty (rest phrase)) site-id (u/guid))))
+                  (if (not-empty (rest phrase)) site-id (s/site-id))))
          {:ct ct
           :insertions insertions
           :phrases starting-phrases
@@ -179,8 +174,4 @@ respecting it." #" "))
   (def ct (atom (c/new-causal-tree :list)))
   (time (do (doall (repeatedly 50 #(swap! ct insert-rand-node))) nil))
   (quick-bench (do (doall (repeatedly 1000 #(insert-rand-node @ct))) nil))
-  (quick-bench (do (c/ct->edn @ct) nil))
-
-  (stest/instrument `c/node)
-  (stest/check `c/node)
-  (spec/exercise-fn `c/node))
+  (quick-bench (do (c/ct->edn @ct) nil)))

@@ -1,12 +1,13 @@
 (ns causal-tree.list
   (:require
-   [causal-tree.util :as u :refer [<< guid]]
+   [causal-tree.util :as u :refer [<<]]
    [causal-tree.shared :as s]))
 
 (defn new-causal-tree []
   {::s/type ::s/list
    ::s/lamport-ts 0
-   ::s/site-id (guid)
+   ::s/guid (u/guid)
+   ::s/site-id (s/site-id)
    ::s/nodes {(first s/root-node) (rest s/root-node)}
    ::s/yarns {(second (first s/root-node)) [s/root-node]}
    ::s/weave [s/root-node]})

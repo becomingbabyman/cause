@@ -20,6 +20,8 @@
 (def speical-keywords #{::delete})
 (def root-id [0 "0"])
 (def root-node [root-id nil nil])
+(def guid-length 21)
+(def site-id-length 13)
 
 (defn gen-string [length]
   (gen/fmap #(apply str %) (gen/vector (gen/char-alpha) length)))
@@ -27,11 +29,12 @@
 (spec/def ::type types)
 (spec/def ::lamport-ts nat-int?) ; AKA the index in a yarn
 ; TODO: should a wall-clock-ts be added? If a central Datomic DB is used then nodes will get a wall clock ts based on when they were synced to the server...
-(spec/def ::basic-guid (spec/with-gen (spec/and string? #(or
-                                                          (= (count %) u/site-id-length)
-                                                          (= % "0")))
-                                      #(gen-string u/site-id-length)))
-(spec/def ::site-id ::basic-guid)
+(spec/def ::guid (spec/with-gen (spec/and string? #(= (count %) guid-length))
+                                #(gen-string guid-length)))
+(spec/def ::site-id (spec/with-gen (spec/and string? #(or
+                                                       (= (count %) site-id-length)
+                                                       (= % "0")))
+                                   #(gen-string site-id-length)))
 (spec/def ::id (spec/tuple ::lamport-ts ::site-id))
 (spec/def ::key (spec/or :k keyword?
                          :s string?))
@@ -52,17 +55,19 @@
                            :cause nil?
                            :value nil?))
 
-(spec/def ::nodes (spec/map-of ::id (spec/tuple ::cause ::value)))
+(spec/def ::nodes (spec/map-of ::id (spec/tuple ::cause ::value) :gen-max 3))
 
-(spec/def ::yarn (spec/coll-of ::node)) ; site specific time sorted vector
-(spec/def ::yarns (spec/map-of ::site-id ::yarn)) ; map of yarns keyed by site-id
+(spec/def ::yarn (spec/coll-of ::node :gen-max 3)) ; site specific time sorted vector
+(spec/def ::yarns (spec/map-of ::site-id ::yarn :gen-max 3)) ; map of yarns keyed by site-id
 
 (spec/def ::weave (spec/or
-                   :list-weave (spec/coll-of ::node) ; ordered vector of operations in the order of their output
-                   :map-weave (spec/map-of ::key (spec/coll-of ::node)))) ; map of ordered vectors corresponding to keys
+                   :list-weave (spec/coll-of ::node :gen-max 3) ; ordered vector of operations in the order of their output
+                   :map-weave (spec/map-of ::key (spec/coll-of ::node :gen-max 3) :gen-max 3))) ; map of ordered vectors corresponding to keys
 
-(spec/def ::causal-tree (spec/keys :req [::nodes ::lamport-ts ::site-id]
+(spec/def ::causal-tree (spec/keys :req [::nodes ::lamport-ts ::guid ::site-id]
                                    :opt [::yarns ::weave]))
+
+(defn site-id [] (u/guid site-id-length))
 
 (defn node
   ([[k v]] ; maps the keys / values in the ::nodes map back to nodes
@@ -71,13 +76,11 @@
    [[lamport-ts site-id] cause value]))
 (spec/fdef node
            :args (spec/or
-                  :arity-1 (spec/cat :node-kv-tuple (spec/tuple ::id seqable?))
-                  :arity-5 (spec/and
-                            (spec/cat :lamport-ts ::lamport-ts
-                                      :site-id ::site-id
-                                      :cause ::cause
-                                      :value ::value)
-                            #(> (:lamport-ts %) (first (:cause %))))) ; node ts must be more than cause ts
+                  :arity-1 (spec/cat :node-kv-tuple (spec/tuple ::id (spec/tuple ::cause ::value)))
+                  :arity-5 (spec/cat :lamport-ts ::lamport-ts
+                                     :site-id ::site-id
+                                     :cause ::cause
+                                     :value ::value))
            :ret ::node
            :fn (spec/and #(not= (first (:ret %)) (get-in % [:args :cause])))) ; cause can't equal node-id
 
