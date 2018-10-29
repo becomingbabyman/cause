@@ -50,7 +50,7 @@
   If a node is passed only that node will be woven in O(n)."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave [])
-           (pmap s/node (sort (::s/nodes causal-tree)))))
+           (map s/node (sort (::s/nodes causal-tree)))))
   ([causal-tree node]
    (if (not (get-in causal-tree [::s/nodes (first node)]))
      causal-tree

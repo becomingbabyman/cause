@@ -1,4 +1,4 @@
-(ns test.list
+(ns causal-tree.list-test
   (:require
    [causal-tree.util :as u]
    [causal-tree.shared :as s]
@@ -9,12 +9,7 @@
    [clojure.spec.alpha :as spec]
    [clojure.spec.gen.alpha :as gen]
    [clojure.spec.test.alpha :as stest]
-   [criterium.core :refer [quick-bench]]
-   [com.walmartlabs.datascope :as ds]))
-
-; TODO: move this a script that's loaded into the user ns on test start
-(require 'pjstadig.humane-test-output)
-(pjstadig.humane-test-output/activate!)
+   #? (:clj [criterium.core :refer [quick-bench]])))
 
 (def simple-values
   (concat [::s/delete ::s/delete ::s/delete \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
@@ -119,12 +114,6 @@
           :initial (c/ct->edn ct)
           :reweave (c/ct->edn (c/weave ct))})))))
 
-(comment
-  (known-idempotent-insert-edge-cases)
-  (time
-   (keep (fn [_] (find-weave-inconsistencies 9))
-         (range 999))))
-
 (def prose (string/split "Hereupon Legrand arose, with a grave and stately air, and brought me the beetle
 from a glass case in which it was enclosed. It was a beautiful scarabaeus, and, at
 that time, unknown to naturalists—of course a great prize in a scientific point
@@ -161,170 +150,37 @@ respecting it." #" "))
          {:ct ct
           :insertions insertions
           :phrases starting-phrases
-          :materialized-weave (c/ct->edn ct)
-          :materialized-reweave (c/ct->edn (c/weave ct))})))))
+          :materialized-weave (apply str (c/ct->edn ct))
+          :materialized-reweave (apply str (c/ct->edn (c/weave ct)))})))))
 
 (deftest concurrent-runs-stick-together
   (let [result (rand-weave-of-phrases 5)]
     (doall (map #(is (string/includes? (:materialized-weave result) %))
                 (:phrases result)))))
 
-(comment
-  (rand-phrase)
-  (dissoc (rand-weave-of-phrases 3) :ct :insertions)
-  (concurrent-runs-stick-together))
-
 (deftest causal-tree
   (known-idempotent-insert-edge-cases)
   (keep (fn [_] (find-weave-inconsistencies 9))
         (range 999))
   (concurrent-runs-stick-together))
-  ; (insert)
-  ; (append)
-  ; (weave)
-  ; (weft)
-  ; (merge)
 
 (comment
-  (causal-tree))
+  (causal-tree)
 
-(comment
-  [:document
-   [:b/paragraph
-    "foo"
-    [:m/italic [:bold "bar"]]
-    [:i/link {:url "http://npr.org"} "fizz"]
-    [:text {:marks [:bold]} "buzz"]]])
+  (known-idempotent-insert-edge-cases)
+  (time
+   (keep (fn [_] (find-weave-inconsistencies 9))
+         (range 999)))
 
-(comment
-  (do
-    (def tct (atom (c/new-causal-tree :list)))
-    (do (time (swap! tct insert-rand-node)) nil)
-    (swap! tct c/conj "h" "e" "l" "l" "o")
-    (c/ct->edn (c/cons "! " @tct))
-    (swap! tct c/insert (rand-node @tct (::s/site-id @tct) :yolo))
-    (time (do (doall (repeatedly 50 #(swap! tct insert-rand-node))) nil))
-    (time (clojure.pprint/pprint (c/ct->edn @tct)))
-    (count (::s/nodes @tct))
-    (idempotent? @tct)
-    (deref tct)
-    (clojure.pprint/pprint [(::s/weave @tct) (::s/weave (c/refresh-caches @tct))]))
-  (quick-bench (do (doall (repeatedly 10000 #(insert-rand-node @tct))) nil))
-  (quick-bench (do (c/ct->edn @tct) nil)))
+  (rand-phrase)
+  (dissoc (rand-weave-of-phrases 3) :ct :insertions)
+  (concurrent-runs-stick-together)
 
-(comment
-  (spec/valid? ::s/lamport-ts 0)
-  (gen/generate (spec/gen ::s/lamport-ts))
-  (gen/generate (spec/gen ::s/basic-guid))
-  (gen/generate (spec/gen ::s/id))
-  (gen/generate (spec/gen ::s/site-id))
-  (gen/generate (spec/gen ::s/root))
-  (gen/generate (spec/gen ::s/node))
-  (gen/generate (spec/gen ::s/value))
-  (gen/generate (spec/gen ::s/causal-tree))
+  (def ct (atom (c/new-causal-tree :list)))
+  (time (do (doall (repeatedly 50 #(swap! ct insert-rand-node))) nil))
+  (quick-bench (do (doall (repeatedly 1000 #(insert-rand-node @ct))) nil))
+  (quick-bench (do (c/ct->edn @ct) nil))
 
   (stest/instrument `c/node)
   (stest/check `c/node)
   (spec/exercise-fn `c/node))
-
-(comment
-  (do
-    (def ct (atom (c/new-causal-tree :list)))
-
-    (u/insert [[1 1] [2 2] [4 4]] [3 3])
-
-    ; (swap! ct assoc ::yarns {})
-    (deref ct)
-    (c/spin @ct)
-    ; (c/spin @ct (c/node (second (::nodes @ct))))
-    ; (swap! ct c/spin)
-
-    (c/weave @ct (second (reverse (sort (::s/nodes @ct)))))
-    (::s/weave (c/weave @ct))
-    (swap! ct c/weave)
-
-    (def test-node (c/node 1 (u/guid) s/root-id \c))
-    (def test-node-2 (c/node 2 (u/guid) (first test-node) \a))
-    (def test-node-3 (c/node 3 (u/guid) (first test-node-2) \r))
-    (swap! ct c/insert test-node)
-    (swap! ct c/insert test-node-2)
-    (swap! ct c/insert test-node-3)
-
-    (swap! ct c/append ::s/delete (first test-node-3))
-    (swap! ct c/append \t (first test-node-2))
-    (swap! ct c/append \k (first test-node))
-    (swap! ct c/append ::s/delete (first test-node))
-
-    (c/ct->edn @ct)
-
-    (def some-weft-ids (map (comp first last last) (::s/yarns @ct)))
-    (c/weft @ct some-weft-ids)
-    ; (c/ct->edn (c/weft @ct [[0 "0"]
-    ;                             [1 "SoEKxJ2JiC5dY"]
-    ;                             [2 "81KYDSlVWQD0~"]
-    ;                             [3 "rTCvwmeN3eRbJ"]
-    ;                             [7 "STVsuW03bB8zO"]
-    ;                             ; [19 "YHBqZnNGiunOS"]
-    ;                             [18 "rOYr~lq0ByHG2"]]))
-    ; (dspec/view @ct)
-    ; (dspec/view (::s/yarns @ct))
-    ; (dspec/view (::s/weave @ct))
-
-    (do
-      ; " and the hat"
-      (def sa (u/guid))
-      (def n1a (c/node 8 sa (ffirst (reverse (::s/weave @ct))) (first " ")))
-      (def n2a (c/node 9 sa (first n1a) \a))
-      (def n3a (c/node 10 sa (first n2a) \n))
-      (def n4a (c/node 11 sa (first n3a) \d))
-      (def n5a (c/node 12 sa (first n4a) (first " ")))
-      (def n6a (c/node 13 sa (first n5a) \t))
-      (def n7a (c/node 14 sa (first n6a) \h))
-      (def n8a (c/node 15 sa (first n7a) \e))
-      (def n9a (c/node 16 sa (first n8a) (first " ")))
-      (def n10a (c/node 17 sa (first n9a) \h))
-      (def n11a (c/node 18 sa (first n10a) \a))
-      (def n12a (c/node 19 sa (first n11a) \t))
-      ; "s love dogs"
-      (def sb (u/guid))
-      ; (def n1b (c/node 8 sb (first (nth (reverse (::s/weave @ct)) 2)) \s))
-      (def n1b (c/node 8 sb (second n1a) \s))
-      (def n2b (c/node 9 sb (first n1b) (first " ")))
-      (def n3b (c/node 10 sb (first n2b) \l))
-      (def n4b (c/node 11 sb (first n3b) \o))
-      (def n5b (c/node 12 sb (first n4b) \v))
-      (def n6b (c/node 13 sb (first n5b) \e))
-      (def n7b (c/node 14 sb (first n6b) (first " ")))
-      (def n8b (c/node 15 sb (first n7b) \d))
-      (def n9b (c/node 16 sb (first n8b) \o))
-      (def n10b (c/node 17 sb (first n9b) \g))
-      (def n11b (c/node 18 sb (first n10b) \s))
-      (swap! ct c/insert n1a)
-      (swap! ct c/insert n2a)
-      (swap! ct c/insert n3a)
-      (swap! ct c/insert n4a)
-      (swap! ct c/insert n5a)
-      (swap! ct c/insert n6a)
-      (swap! ct c/insert n7a)
-      (swap! ct c/insert n8a)
-      (swap! ct c/insert n9a)
-      (swap! ct c/insert n10a)
-      (swap! ct c/insert n11a)
-      (swap! ct c/insert n12a)
-      (swap! ct c/insert n1b)
-      (swap! ct c/insert n2b)
-      (swap! ct c/insert n3b)
-      (swap! ct c/insert n4b)
-      (swap! ct c/insert n5b)
-      (swap! ct c/insert n6b)
-      (swap! ct c/insert n7b)
-      (swap! ct c/insert n8b)
-      (swap! ct c/insert n9b)
-      (swap! ct c/insert n10b)
-      (swap! ct c/insert n11b))
-
-    (c/ct->edn @ct)
-    (c/ct->edn (c/weave @ct))
-    ; (swap! ct weave)
-    ; (dspec/view (::weave @ct))
-    (deref ct)))

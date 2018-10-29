@@ -1,3 +1,9 @@
 classes/*
 target/*
 .cpcache/*
+node_modules/*
+.lein-failures
+.lein-repl-history
+.rebel_readline_history
+figwheel_server.log
+resources/public/js/*
