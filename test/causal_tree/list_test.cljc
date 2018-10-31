@@ -109,6 +109,10 @@
           :initial (c/ct->edn ct)
           :reweave (c/ct->edn (c/weave ct))})))))
 
+(deftest try-to-find-new-idempotent-edge-cases
+  (is (empty? (keep (fn [_] (find-weave-inconsistencies 9))
+                    (range 99)))))
+
 (def prose (string/split "Hereupon Legrand arose, with a grave and stately air, and brought me the beetle
 from a glass case in which it was enclosed. It was a beautiful scarabaeus, and, at
 that time, unknown to naturalists—of course a great prize in a scientific point
@@ -153,25 +157,20 @@ respecting it." #" "))
     (doall (map #(is (string/includes? (:materialized-weave result) %))
                 (:phrases result)))))
 
-(deftest causal-tree
-  (known-idempotent-insert-edge-cases)
-  (keep (fn [_] (find-weave-inconsistencies 9))
-        (range 999))
-  (concurrent-runs-stick-together))
-
 (comment
-  (causal-tree)
+  (do
+    (known-idempotent-insert-edge-cases)
+    (try-to-find-new-idempotent-edge-cases)
+    (concurrent-runs-stick-together))
 
-  (known-idempotent-insert-edge-cases)
   (time
    (keep (fn [_] (find-weave-inconsistencies 9))
          (range 999)))
 
   (rand-phrase)
   (dissoc (rand-weave-of-phrases 3) :ct :insertions)
-  (concurrent-runs-stick-together)
 
   (def ct (atom (c/new-causal-tree :list)))
   (time (do (doall (repeatedly 50 #(swap! ct insert-rand-node))) nil))
-  (quick-bench (do (doall (repeatedly 1000 #(insert-rand-node @ct))) nil))
+  (quick-bench (do (insert-rand-node @ct) nil))
   (quick-bench (do (c/ct->edn @ct) nil)))
