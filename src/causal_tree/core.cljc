@@ -86,5 +86,6 @@
 (defn last- [causal-tree] (println "TODO"))
 (defn next- [causal-tree] (println "TODO"))
 (defn rest- [causal-tree] (println "TODO"))
+
 (defn undo- [causal-tree & site-id] (println "TODO"))
 (defn redo- [causal-tree & site-id] (println "TODO"))
