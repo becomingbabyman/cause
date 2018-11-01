@@ -87,7 +87,24 @@
   ;   different timestamps? Or should all the nodes have to match?
   (equals [this o] (.equals (.ct this) o))
   (hashCode [this] (.hashCode (.ct this)))
-  (toString [this] (.toString (s/ct->edn (.ct this)))))
+  (toString [this] (.toString (s/ct->edn (.ct this))))
+
+  ILookup
+  (valAt [this k] (get- (.ct this) k))
+  (valAt [this k not-found] (or (.valAt this k) not-found))
+
+  IMapIterable
+  (keyIterator [this] (.keyIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
+  (valIterator [this] (.valIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
+
+  IKVReduce
+  (kvreduce [this f init] (.kvreduce ^IKVReduce (s/ct->edn (.ct this) :deref-atoms false) f init))
+
+  IHashEq
+  (hasheq [this] (.hasheq ^IHashEq (s/ct->edn (.ct this) :deref-atoms false)))
+
+  Seqable
+  (seq [this] (.seq ^Seqable (s/ct->edn (.ct this) :deref-atoms false))))
 
 (defmethod print-method CausalMap [o ^java.io.Writer w]
   (.write w (str "#ct/map " (pr-str {:ct->edn (s/ct->edn (.ct o))
@@ -97,11 +114,13 @@
   (CausalMap. (new-causal-tree)))
 
 (comment
-  (def ct (atom (new-causal-map)))
-  (swap! ct assoc :foo "bar")
-  (swap! ct assoc :foo "bop")
-  (swap! ct dissoc :foo)
-  (swap! ct assoc :fizz "bang")
+  (do
+    (def ct (atom (new-causal-map)))
+    (swap! ct assoc :foo "bar")
+    (swap! ct assoc :fizz "bang")
+    (swap! ct dissoc :foo)
+    (swap! ct assoc :foo "bop")
+    (swap! ct assoc :flip "flop"))
   (swap! ct dissoc :fizz)
   (count @ct)
   (hash @ct)
@@ -112,10 +131,32 @@
   (empty @ct)
   (def ct2 (atom @ct))
   (swap! ct2 assoc :foo "bing")
+  (swap! ct assoc :ct2 ct2)
   (= @ct @ct2)
   (deref ct)
-  (cons @ct {:a 2 :b 3 :foo "wat"}) ; TODO: implement cons? IPersistentCollection cons is actually conj...
+  (cons "wat" @ct)
   (conj @ct {:a 2 :b 3 :foo "wat"})
-  (apply assoc {:a 1} (flatten (vec {:a 2 :b 3})))
-  (::s/lamport-ts (.ct @ct))
-  (select-keys (new-causal-tree) [::s/lamport-ts ::s/guid]))
+  (get @ct :fizz)
+  (:foo @ct)
+  (get @ct :gloop "glop")
+  (keys @ct)
+  (vals @ct)
+  (seq {:a 2 :b 3})
+  (type @ct)
+  (s/ct->edn @ct :deref-atoms false)
+  (s/ct->edn @ct)
+  (seq @ct)
+  (first @ct)
+  (ffirst @ct)
+  (second @ct)
+  (last @ct)
+  (next @ct)
+  (rest @ct)
+  (map (partial map clojure.string/upper-case) @ct)
+  (reduce-kv conj [] @ct)
+  (empty? @ct)
+  (swap! ct dissoc :foo)
+  (swap! ct dissoc :fizz)
+  (swap! ct dissoc :flip)
+  (empty? @ct)
+  (+ 1 1))

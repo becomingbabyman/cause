@@ -186,46 +186,53 @@
             (yarns->nodes)
             (weave-fn))))))
 
-(declare ct->edn)
+(declare ct-opts->edn)
 
 (defn ct-map->edn
   "Returns the current state of the tree as edn. E.g. a tree of ks & vs
   will materialize as a map. This is mostly for testing and pretty
   printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree]
+  ([causal-tree opts]
    (reduce (fn [acc [k [[_ v]]]]
              (if (= v ::delete)
                acc
-               (assoc acc k (ct->edn v))))
+               (assoc acc k (ct-opts->edn v opts))))
            {} (::weave causal-tree))))
 
 (defn ct-list->edn
   "Returns the current state of the tree as edn. E.g. a tree of chars
   will materialize as a string. This is mostly for testing and pretty
   printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree]
+  ([causal-tree opts]
    (->> (::weave causal-tree)
         (partition 3 1 nil)
-        (keep (partial ct-list->edn causal-tree))))
+        (keep (partial ct-list->edn causal-tree opts))))
         ; (apply str)))
-  ([causal-tree [nl nm nr]]
+  ([causal-tree opts [nl nm nr]]
    (cond
      (= ::delete (last nm)) nil ; Don't return deletes.
      (and (= ::delete (last nr)) ; If the next node is a delete
           (= (first nm) (second nr))) nil ; and it deletes this node, return nil
-     :else (ct->edn (last nm))))) ; Return the value.
+     :else (ct-opts->edn (last nm) opts)))) ; Return the value.
 
 (defn ct->edn
   "Takes a value. If it's a causal tree it returns the data representing the
   current state of the tree. If it's not a causal tree it just returns the value."
-  [causal-tree-or-any-value]
-  (case (::type causal-tree-or-any-value)
-    nil (if (= (type causal-tree-or-any-value)
-               #? (:clj clojure.lang.Atom :cljs Atom))
-          (ct->edn (deref causal-tree-or-any-value)) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
-          causal-tree-or-any-value)
-    ::map (ct-map->edn causal-tree-or-any-value)
-    ::list (ct-list->edn causal-tree-or-any-value)))
+  [ct-or-v & {:keys [deref-atoms] :or {deref-atoms true} :as opts}]
+  (cond
+    (= ::map (::type ct-or-v)) (ct-map->edn ct-or-v opts)
+    (= ::list (::type ct-or-v)) (ct-list->edn ct-or-v opts)
+    (= #? (:clj clojure.lang.Atom :cljs Atom) (type ct-or-v))
+    (if deref-atoms
+      (ct-opts->edn (deref ct-or-v) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
+      ct-or-v)
+    ; TODO: WTF: what's up with this??? (= causal_tree.map.CausalMap (type ct-or-v)) only works sometimes, same with with instance?
+    (= "class causal_tree.map.CausalMap" (str (type ct-or-v)))
+    (ct-opts->edn (.ct ct-or-v) opts)
+    :else ct-or-v))
+
+(defn ct-opts->edn [ct opts]
+  (apply ct->edn ct (flatten (seq (remove nil? opts)))))
 
 ; TODO: should this take whole trees or a tree and nodes?
 ;   Nodes are simpler, can be sorted, and merged in with O(n*m)
