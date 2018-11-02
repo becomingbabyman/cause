@@ -1,11 +1,12 @@
 (ns causal-tree.map
-  (:require
-   [causal-tree.util :as u :refer [<<]]
-   [causal-tree.shared :as s])
-  #? (:clj (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
-                    (java.io Writer)
-                    (java.util Date Collection)
-                    (java.lang Object))))
+  (:require [causal-tree.util :as u :refer [<<]]
+            [causal-tree.shared :as s]
+            #? (:cljs [cljs.reader :as reader]))
+  #? (:clj
+      (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
+               (java.io Writer)
+               (java.util Date Collection)
+               (java.lang Object))))
 
 (defn new-causal-tree []
   {::s/type ::s/map
@@ -67,48 +68,123 @@
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- causal-tree k) ks)))
 
-(deftype CausalMap [ct]
-  Counted
-  (count [this] (count- (.ct this)))
+(defn empty- [causal-tree]
+  (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/guid])))
 
-  IPersistentCollection
-  (cons [this o] (CausalMap. (apply assoc- (.ct this) (flatten (vec o)))))
-  (empty [this] (CausalMap. (conj (new-causal-tree) (select-keys (.ct this) [::s/site-id ::s/guid]))))
-  (equiv [this other] (.equiv ^IPersistentCollection (.ct this) other))
+#? (:clj
+    (deftype CausalMap [ct]
+      Counted
+      (count [this] (count- (.ct this)))
 
-  IPersistentMap
-  (assoc [this k v] (CausalMap. (assoc- (.ct this) k v)))
-  (assocEx [this k v] (throw (Exception.)))
-  (without [this k] (CausalMap. (dissoc- (.ct this) k)))
+      IPersistentCollection
+      (cons [this o] (CausalMap. (apply assoc- (.ct this) (flatten (vec o)))))
+      (empty [this] (CausalMap. (empty- (.ct this))))
+      (equiv [this other] (.equiv ^IPersistentCollection (.ct this) other))
 
-  Object
-  ; TODO: what should equality mean? Should it be maps that materialize
-  ;   to the same value? Or maps with the same UUID even if they are at
-  ;   different timestamps? Or should all the nodes have to match?
-  (equals [this o] (.equals (.ct this) o))
-  (hashCode [this] (.hashCode (.ct this)))
-  (toString [this] (.toString (s/ct->edn (.ct this))))
+      IPersistentMap
+      (assoc [this k v] (CausalMap. (assoc- (.ct this) k v)))
+      (assocEx [this k v] (throw (Exception.)))
+      (without [this k] (CausalMap. (dissoc- (.ct this) k)))
 
-  ILookup
-  (valAt [this k] (get- (.ct this) k))
-  (valAt [this k not-found] (or (.valAt this k) not-found))
+      Object
+          ; TODO: what should equality mean? Should it be maps that materialize
+          ;   to the same value? Or maps with the same UUID even if they are at
+          ;   different timestamps? Or should all the nodes have to match?
+      (equals [this o] (.equals (.ct this) o))
+      (hashCode [this] (.hashCode (.ct this)))
+      (toString [this] (.toString (s/ct->edn (.ct this))))
 
-  IMapIterable
-  (keyIterator [this] (.keyIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
-  (valIterator [this] (.valIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
+      ILookup
+      (valAt [this k] (get- (.ct this) k))
+      (valAt [this k not-found] (or (.valAt this k) not-found))
 
-  IKVReduce
-  (kvreduce [this f init] (.kvreduce ^IKVReduce (s/ct->edn (.ct this) :deref-atoms false) f init))
+      IMapIterable
+      (keyIterator [this] (.keyIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
+      (valIterator [this] (.valIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
 
-  IHashEq
-  (hasheq [this] (.hasheq ^IHashEq (s/ct->edn (.ct this) :deref-atoms false)))
+      IKVReduce
+      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/ct->edn (.ct this) :deref-atoms false) f init))
 
-  Seqable
-  (seq [this] (.seq ^Seqable (s/ct->edn (.ct this) :deref-atoms false))))
+      IHashEq
+      (hasheq [this] (.hasheq ^IHashEq (.ct this)))
 
-(defmethod print-method CausalMap [o ^java.io.Writer w]
-  (.write w (str "#ct/map " (pr-str {:ct->edn (s/ct->edn (.ct o))
-                                     :ct (.ct o)}))))
+      Seqable
+      (seq [this] (.seq ^Seqable (s/ct->edn (.ct this) :deref-atoms false)))
+
+      IFn
+      (invoke [this k] (.invoke ^IFn (.ct this) k))
+      (invoke [this k not-found] (.invoke ^IFn (.ct this) k not-found))
+
+      IObj
+      (withMeta [this meta] (CausalMap. (with-meta ^IObj (.ct this) meta)))
+
+      IMeta
+      (meta [this] (.meta ^IMeta (.ct this))))
+    :cljs
+    (deftype CausalMap [ct]
+      ICounted
+      (-count [this] (count- (.-ct this)))
+
+      IEmptyableCollection
+      (-empty [this] (CausalMap. (empty- (.-ct this))))
+
+      ICollection
+      (-conj [this o] (CausalMap. (apply assoc- (.-ct this) (flatten (vec o)))))
+
+      IAssociative
+      (-contains-key? [this k] (some? (get- (.-ct this) k)))
+      (-assoc [this k v] (assoc- (.-ct this) k v))
+
+      IFind
+      (-find [this k] (get- (.-ct this) k))
+
+      IMap
+      (-dissoc [this k] (dissoc- (.-ct this) k))
+
+      IKVReduce
+      (-kv-reduce [this f init] (-kv-reduce (s/ct->edn (.-ct this) :deref-atoms false) f init))
+
+      IEquiv
+      (-equiv [this other] (-equiv (.-ct this) other))
+
+      ILookup
+      (-lookup [this o] (get- (.-ct this) o))
+      (-lookup [this o not-found] (-lookup (.-ct this) o not-found))
+
+      IPrintWithWriter
+      (-pr-writer [o writer opts]
+        (-write writer (str "#ct/map " (pr-str {:ct->edn (s/ct->edn (.-ct o))
+                                                :ct (.-ct o)}))))
+
+      IHash
+      (-hash [this] (-hash (.-ct this)))
+
+      IFn
+      (-invoke [this o] ((.-ct this) o))
+      (-invoke [this o not-found] ((.-ct this) o not-found))
+
+      ISeqable
+      (-seq [this] (-seq (s/ct->edn (.-ct this) :deref-atoms false)))
+
+      Object
+      (toString [this] (.toString (s/ct->edn (.-ct this))))
+
+      IMeta
+      (-meta [this] (-meta (.-ct this)))
+
+      IWithMeta
+      (-with-meta [this meta] (CausalMap. (-with-meta (.-ct this) meta)))))
+
+#? (:clj (defmethod print-method CausalMap [o ^java.io.Writer w]
+           (.write w (str "#ct/map " (pr-str {:ct->edn (s/ct->edn (.ct o))
+                                              :ct (.ct o)})))))
+
+(defn read-edn-map
+  [read-object]
+  (let [[ct] read-object]
+    (CausalMap. ct)))
+
+#? (:cljs (cljs.reader/register-tag-parser! 'ct/map read-edn-map))
 
 (defn new-causal-map []
   (CausalMap. (new-causal-tree)))
@@ -138,10 +214,10 @@
   (conj @ct {:a 2 :b 3 :foo "wat"})
   (get @ct :fizz)
   (:foo @ct)
+  (@ct ::s/guid)
   (get @ct :gloop "glop")
   (keys @ct)
   (vals @ct)
-  (seq {:a 2 :b 3})
   (type @ct)
   (s/ct->edn @ct :deref-atoms false)
   (s/ct->edn @ct)
