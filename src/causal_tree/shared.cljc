@@ -219,6 +219,7 @@
   "Takes a value. If it's a causal tree it returns the data representing the
   current state of the tree. If it's not a causal tree it just returns the value."
   [ct-or-v & {:keys [deref-atoms] :or {deref-atoms true} :as opts}]
+  ; (println ">>>" deref-atoms (type->str (type ct-or-v)) (= "causal-tree.map/CausalMap" (type->str (type ct-or-v))))
   (cond
     (= ::map (::type ct-or-v)) (ct-map->edn ct-or-v opts)
     (= ::list (::type ct-or-v)) (ct-list->edn ct-or-v opts)
@@ -226,9 +227,10 @@
     (if deref-atoms
       (ct-opts->edn (deref ct-or-v) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
       ct-or-v)
-    ; TODO: WTF: what's up with this??? (= causal_tree.map.CausalMap (type ct-or-v)) only works sometimes, same with with instance?
-    (= "class causal_tree.map.CausalMap" (str (type ct-or-v)))
-    (ct-opts->edn (.ct ct-or-v) opts)
+    ; TODO: if ct->edn pulled into another ns then this class could be imported and instance? could be used rather than a string comparison
+    #? (:clj (= "class causal_tree.map.CausalMap" (str (type ct-or-v)))
+             :cljs (= "causal-tree.map/CausalMap" (type->str (type ct-or-v))))
+    (ct-opts->edn #? (:clj (.ct ct-or-v) :cljs (.-ct ct-or-v)) opts)
     :else ct-or-v))
 
 (defn ct-opts->edn [ct opts]

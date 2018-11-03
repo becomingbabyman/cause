@@ -1,7 +1,7 @@
 (ns causal-tree.map
   (:require [causal-tree.util :as u :refer [<<]]
             [causal-tree.shared :as s]
-            #? (:cljs [cljs.reader :as reader]))
+            #? (:cljs [cljs.reader]))
   #? (:clj
       (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
                (java.io Writer)
@@ -133,13 +133,13 @@
 
       IAssociative
       (-contains-key? [this k] (some? (get- (.-ct this) k)))
-      (-assoc [this k v] (assoc- (.-ct this) k v))
+      (-assoc [this k v] (CausalMap. (assoc- (.-ct this) k v)))
 
       IFind
       (-find [this k] (get- (.-ct this) k))
 
       IMap
-      (-dissoc [this k] (dissoc- (.-ct this) k))
+      (-dissoc [this k] (CausalMap. (dissoc- (.-ct this) k)))
 
       IKVReduce
       (-kv-reduce [this f init] (-kv-reduce (s/ct->edn (.-ct this) :deref-atoms false) f init))
@@ -203,7 +203,6 @@
   (str @ct)
   (deref ct)
   (count- (.ct @ct))
-  (cons {:a 1} {:a 2 :b 3})
   (empty @ct)
   (def ct2 (atom @ct))
   (swap! ct2 assoc :foo "bing")
@@ -218,7 +217,9 @@
   (get @ct :gloop "glop")
   (keys @ct)
   (vals @ct)
-  (type @ct)
+  (type->str (type @ct))
+  (str (type @ct))
+  (instance? causal_tree.map.CausalMap @ct)
   (s/ct->edn @ct :deref-atoms false)
   (s/ct->edn @ct)
   (seq @ct)

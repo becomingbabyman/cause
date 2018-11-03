@@ -9,7 +9,7 @@
 (defn new-causal-tree [type]
   (case type
     :list (ct-list/new-causal-tree)
-    :map (ct-map/new-causal-tree)))
+    :map (ct-map/new-causal-map)))
 
 (def spin s/spin)
 
