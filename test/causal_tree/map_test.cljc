@@ -5,7 +5,7 @@
    [clojure.test :refer [deftest is]]))
 
 (deftest map-test
-  (-> (c/new-causal-tree :map)
+  (-> (c/causal-map)
       (assoc :foo "bar")
       (assoc :fizz "buzz")
       (assoc :fizz "bang")

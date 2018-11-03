@@ -4,12 +4,18 @@
    [causal-tree.list :as ct-list]
    [causal-tree.map :as ct-map]))
 
+; Primary Data Types. Use these. They have an accessible Clojurey interface.
+
+(def causal-map ct-map/new-causal-map)
+
+; Causal Tree Functions
+
 (def node s/node)
 
 (defn new-causal-tree [type]
   (case type
     :list (ct-list/new-causal-tree)
-    :map (ct-map/new-causal-map)))
+    :map (ct-map/new-causal-tree)))
 
 (def spin s/spin)
 
@@ -48,6 +54,8 @@
     causal-tree))
 
 (def ct->edn s/ct->edn)
+
+; (defn edn->ct [])
 
 (defn merge-trees [causal-tree1 & args]
   (case (::s/type causal-tree1)
