@@ -231,6 +231,9 @@
     #? (:clj (= "class causal_tree.map.CausalMap" (str (type ct-or-v)))
              :cljs (= "causal-tree.map/CausalMap" (type->str (type ct-or-v))))
     (ct-opts->edn #? (:clj (.ct ct-or-v) :cljs (.-ct ct-or-v)) opts)
+    #? (:clj (= "class causal_tree.list.CausalList" (str (type ct-or-v)))
+             :cljs (= "causal-tree.list/CausalList" (type->str (type ct-or-v))))
+    (ct-opts->edn #? (:clj (.ct ct-or-v) :cljs (.-ct ct-or-v)) opts)
     :else ct-or-v))
 
 (defn ct-opts->edn [ct opts]

@@ -7,6 +7,7 @@
 ; Primary Data Types. Use these. They have an accessible Clojurey interface.
 
 (def causal-map ct-map/new-causal-map)
+(def causal-list ct-list/new-causal-list)
 
 ; Causal Tree Functions
 

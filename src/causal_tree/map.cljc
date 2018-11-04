@@ -88,8 +88,7 @@
 
       Object
           ; TODO: what should equality mean? Should it be maps that materialize
-          ;   to the same value? Or maps with the same UUID even if they are at
-          ;   different timestamps? Or should all the nodes have to match?
+          ;   to the same value? Or should all the nodes have to match?
       (equals [this o] (.equals (.ct this) o))
       (hashCode [this] (.hashCode (.ct this)))
       (toString [this] (.toString (s/ct->edn (.ct this))))
