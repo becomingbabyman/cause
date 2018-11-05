@@ -1,12 +1,19 @@
 (ns causal-tree.list
   (:require
    [causal-tree.util :as u :refer [<<]]
-   [causal-tree.shared :as s]))
+   [causal-tree.shared :as s]
+   [causal-tree.protocols :as proto]
+   #? (:cljs [cljs.reader]))
+  #? (:clj
+      (:import (clojure.lang IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
+               (java.io Writer)
+               (java.util Date Collection)
+               (java.lang Object))))
 
 (defn new-causal-tree []
   {::s/type ::s/list
    ::s/lamport-ts 0
-   ::s/guid (u/guid)
+   ::s/uuid (u/uid)
    ::s/site-id (s/site-id)
    ::s/nodes {(first s/root-node) (rest s/root-node)}
    ::s/yarns {(second (first s/root-node)) [s/root-node]}
@@ -39,9 +46,6 @@
     (or (not= ::s/delete (last nm)) ; and this node is not a delete
         (= ::s/delete (last nr)))) ; or the next node is a delete, don't weave.
    (and
-    ; (or (= (second nm) (second nr)) ; if this node and the next node are caused by the same node
-    ;     (and (not= (first nl) (second nr)) ; the next node is not part of a run
-    ;          (not= (first nl) (second nm)))) ; and this node is not part of a run
     (<< (first nm) (first nr)) ; and this node is older
     (or (not= ::s/delete (last nm)) ; and this node is not a delete
         (= ::s/delete (last nr)))))) ; or the next node is a delete, don't weave.
@@ -76,7 +80,139 @@
   ([causal-tree v & vs]
    (apply conj- (conj- causal-tree v) vs))
   ([causal-tree v]
-   (s/append causal-tree (first (last (::s/weave causal-tree))) v weave)))
+   (s/append weave causal-tree (first (last (::s/weave causal-tree))) v)))
 
 (defn cons- [v causal-tree]
-  (s/append causal-tree s/root-id v weave))
+  (s/append weave causal-tree s/root-id v))
+
+(defn empty- [causal-tree]
+  (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/uuid])))
+
+#? (:clj
+    (deftype CausalList [ct]
+      Counted
+      (count [this] (.count (s/causal->edn (.ct this) :deref-atoms false)))
+
+      IPersistentCollection
+      (cons [this o] (CausalList. (conj- (.ct this) o)))
+      (empty [this] (CausalList. (empty- (.ct this))))
+      (equiv [this other] (.equiv ^IPersistentCollection (.ct this) other))
+
+      Object
+          ; TODO: what should equality mean? Should it be lists that materialize
+          ;   to the same value? Or should all the nodes have to match?
+      (equals [this o] (.equals (.ct this) o))
+      (hashCode [this] (.hashCode (.ct this)))
+      (toString [this] (.toString (s/causal->edn (.ct this))))
+
+      IHashEq
+      (hasheq [this] (.hasheq ^IHashEq (.ct this)))
+
+      Seqable
+      (seq [this] (.seq ^Seqable (s/causal->edn (.ct this) :deref-atoms false)))
+
+      IObj
+      (withMeta [this meta] (CausalList. (with-meta ^IObj (.ct this) meta)))
+
+      IMeta
+      (meta [this] (.meta ^IMeta (.ct this))))
+    :cljs
+    (deftype CausalList [ct]
+      ICounted
+      (-count [this] (-count (vec (s/causal->edn (.-ct this) :deref-atoms false))))
+
+      IEmptyableCollection
+      (-empty [this] (CausalList. (empty- (.-ct this))))
+
+      ICollection
+      (-conj [this o] (CausalList. (conj- (.-ct this) o)))
+
+      IEquiv
+      (-equiv [this other] (-equiv (.-ct this) other))
+
+      IPrintWithWriter
+      (-pr-writer [o writer opts]
+        (-write writer (str "#ct/list " (pr-str {:causal->edn (s/causal->edn (.-ct o))
+                                                 :ct (.-ct o)}))))
+
+      IHash
+      (-hash [this] (-hash (.-ct this)))
+
+      ISeqable
+      (-seq [this] (-seq (s/causal->edn (.-ct this) :deref-atoms false)))
+
+      Object
+      (toString [this] (.toString (s/causal->edn (.-ct this))))
+
+      IMeta
+      (-meta [this] (-meta (.-ct this)))
+
+      IWithMeta
+      (-with-meta [this meta] (CausalList. (-with-meta (.-ct this) meta)))))
+
+#? (:clj (defmethod print-method CausalList [^CausalList o ^java.io.Writer w]
+           (.write w (str "#ct/list " (pr-str {:causal->edn (s/causal->edn (.ct o))
+                                               :ct (.ct o)})))))
+
+(defn read-edn-map
+  [read-object]
+  (let [[ct] read-object]
+    (CausalList. ct)))
+
+#? (:cljs (cljs.reader/register-tag-parser! 'ct/list read-edn-map))
+
+(extend-type CausalList
+  proto/CausalTree
+  (get-uuid [this] (::s/uuid (.-ct this)))
+  (get-ts [this] (::s/lamport-ts (.-ct this)))
+  (get-site-id [this] (::s/site-id (.-ct this)))
+  (get-weave [this] (::s/weave (.-ct this)))
+  (insert [this node]
+    (CausalList. (s/insert weave (.-ct this) node)))
+  (append [this cause value]
+    (CausalList. (s/append weave (.-ct this) cause value)))
+  (weft [this ids-to-cut-yarns]
+    (CausalList. (s/weft weave new-causal-tree (.-ct this) ids-to-cut-yarns)))
+  (causal-merge [causal-list1 causal-list2]
+    (CausalList. (s/merge-trees weave (.-ct causal-list1) (.-ct causal-list2)))))
+
+(defn new-causal-list []
+  (CausalList. (new-causal-tree)))
+
+(comment
+  (do
+    (def ct (atom (new-causal-list)))
+    (swap! ct conj "f" "o" "o")
+    (swap! ct conj " ")
+    (swap! ct conj "b" "a" "r")
+    (swap! ct proto/append (first (second (proto/get-weave @ct))) ::s/delete)
+    (swap! ct proto/append (first (second (proto/get-weave @ct))) "g"))
+  (count @ct)
+  (hash @ct)
+  (str @ct)
+  (deref ct)
+  (empty @ct)
+  (def ct2 (atom @ct))
+  (swap! ct conj ct2)
+  (= @ct @ct2)
+  (deref ct)
+  (cons "wat" @ct)
+  (get @ct 0)
+  (type->str (type @ct))
+  (str (type @ct))
+  (instance? causal_tree.list.CausalList @ct)
+  (s/causal->edn @ct :deref-atoms false)
+  (s/causal->edn @ct)
+  (vec @ct)
+  (first @ct)
+  (ffirst @ct)
+  (second @ct)
+  (last @ct)
+  (next @ct)
+  (rest @ct)
+  (map clojure.string/upper-case @ct)
+  (reduce conj [] @ct)
+  (into [] @ct)
+  (empty? @ct)
+  (empty? (new-causal-list))
+  (+ 1 1))

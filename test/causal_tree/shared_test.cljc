@@ -20,4 +20,4 @@
   ;   It's currently in master awaiting the next release: https://github.com/clojure/clojurescript/blame/master/src/main/cljs/cljs/spec/test/alpha.cljc#L25
   ; (->> (stest/enumerate-namespace 'causal-tree.shared)
   ;      (stest/check)
-  ;      (map #(is (get-in % [:clojure.spec.test.check/ret :pass?])))))
+  ;      (map #(is (get-in % [ret-key :pass?])))))

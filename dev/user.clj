@@ -6,7 +6,7 @@
 (pjstadig.humane-test-output/activate!)
 
 (defn start-fw []
-  (ra/start-figwheel!))
+  (ra/start-figwheel! "dev"))
 
 (defn stop-fw []
   (ra/stop-figwheel!))

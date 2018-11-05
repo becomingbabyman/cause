@@ -6,7 +6,7 @@
                       :url "https://opensource.org/licenses/MIT"}
 
             :dependencies [[org.clojure/clojure "1.9.0" :scope "provided"]
-                           [org.clojure/clojurescript "1.10.339" :scope "provided"]
+                           [org.clojure/clojurescript "1.10.439" :scope "provided"]
                            [org.clojure/core.async "0.4.474"]
                            [nano-id "0.9.3"]]
 
@@ -36,6 +36,7 @@
             :aliases {"deploy" ["do" "clean," "deploy" "clojars"]
                       "test" ["do" ["clean"] ["test"]]
                       "cljs-test" ["do" ["doo" "browsers" "browser-test" "once"]]
+                      "cljs-test-phantom" ["do" ["doo" "phantom" "browser-test" "once"]]
                       "cljs-test-watch" ["do" ["doo" "browsers" "browser-test" "auto"]]}
 
             :clean-targets ^{:protect false} ["target"]
@@ -47,7 +48,7 @@
                :compiler {:main causal-tree.runner
                           :output-to "target/browser-test/browser-test.js"
                           :output-dir "target/browser-test/out"
-                          :optimizations :advanced
+                          :optimizations :none
                           :parallel-build true}}
               {:id "dev"
                :figwheel {:open-urls ["http://localhost:3449"]}
