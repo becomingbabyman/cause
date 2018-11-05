@@ -31,7 +31,7 @@
                              [com.cemerick/piggieback "0.2.1"]]
               :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}}}
 
-            :doo {:alias {:browsers [:chrome :firefox]}}
+            :doo {:alias {:browsers [:electron :chrome :firefox]}}
 
             :aliases {"deploy" ["do" "clean," "deploy" "clojars"]
                       "test" ["do" ["clean"] ["test"]]
