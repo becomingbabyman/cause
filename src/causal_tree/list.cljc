@@ -2,6 +2,7 @@
   (:require
    [causal-tree.util :as u :refer [<<]]
    [causal-tree.shared :as s]
+   [causal-tree.protocols :as proto]
    #? (:cljs [cljs.reader]))
   #? (:clj
       (:import (clojure.lang IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
@@ -12,7 +13,7 @@
 (defn new-causal-tree []
   {::s/type ::s/list
    ::s/lamport-ts 0
-   ::s/guid (u/guid)
+   ::s/uuid (u/uid)
    ::s/site-id (s/site-id)
    ::s/nodes {(first s/root-node) (rest s/root-node)}
    ::s/yarns {(second (first s/root-node)) [s/root-node]}
@@ -79,18 +80,18 @@
   ([causal-tree v & vs]
    (apply conj- (conj- causal-tree v) vs))
   ([causal-tree v]
-   (s/append causal-tree (first (last (::s/weave causal-tree))) v weave)))
+   (s/append weave causal-tree (first (last (::s/weave causal-tree))) v)))
 
 (defn cons- [v causal-tree]
-  (s/append causal-tree s/root-id v weave))
+  (s/append weave causal-tree s/root-id v))
 
 (defn empty- [causal-tree]
-  (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/guid])))
+  (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/uuid])))
 
 #? (:clj
     (deftype CausalList [ct]
       Counted
-      (count [this] (.count (s/ct->edn (.ct this) :deref-atoms false)))
+      (count [this] (.count (s/causal->edn (.ct this) :deref-atoms false)))
 
       IPersistentCollection
       (cons [this o] (CausalList. (conj- (.ct this) o)))
@@ -102,13 +103,13 @@
           ;   to the same value? Or should all the nodes have to match?
       (equals [this o] (.equals (.ct this) o))
       (hashCode [this] (.hashCode (.ct this)))
-      (toString [this] (.toString (s/ct->edn (.ct this))))
+      (toString [this] (.toString (s/causal->edn (.ct this))))
 
       IHashEq
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
 
       Seqable
-      (seq [this] (.seq ^Seqable (s/ct->edn (.ct this) :deref-atoms false)))
+      (seq [this] (.seq ^Seqable (s/causal->edn (.ct this) :deref-atoms false)))
 
       IObj
       (withMeta [this meta] (CausalList. (with-meta ^IObj (.ct this) meta)))
@@ -118,7 +119,7 @@
     :cljs
     (deftype CausalList [ct]
       ICounted
-      (-count [this] (-count (vec (s/ct->edn (.-ct this) :deref-atoms false))))
+      (-count [this] (-count (vec (s/causal->edn (.-ct this) :deref-atoms false))))
 
       IEmptyableCollection
       (-empty [this] (CausalList. (empty- (.-ct this))))
@@ -131,17 +132,17 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#ct/list " (pr-str {:ct->edn (s/ct->edn (.-ct o))
+        (-write writer (str "#ct/list " (pr-str {:causal->edn (s/causal->edn (.-ct o))
                                                  :ct (.-ct o)}))))
 
       IHash
       (-hash [this] (-hash (.-ct this)))
 
       ISeqable
-      (-seq [this] (-seq (s/ct->edn (.-ct this) :deref-atoms false)))
+      (-seq [this] (-seq (s/causal->edn (.-ct this) :deref-atoms false)))
 
       Object
-      (toString [this] (.toString (s/ct->edn (.-ct this))))
+      (toString [this] (.toString (s/causal->edn (.-ct this))))
 
       IMeta
       (-meta [this] (-meta (.-ct this)))
@@ -149,8 +150,8 @@
       IWithMeta
       (-with-meta [this meta] (CausalList. (-with-meta (.-ct this) meta)))))
 
-#? (:clj (defmethod print-method CausalList [o ^java.io.Writer w]
-           (.write w (str "#ct/list " (pr-str {:ct->edn (s/ct->edn (.ct o))
+#? (:clj (defmethod print-method CausalList [^CausalList o ^java.io.Writer w]
+           (.write w (str "#ct/list " (pr-str {:causal->edn (s/causal->edn (.ct o))
                                                :ct (.ct o)})))))
 
 (defn read-edn-map
@@ -160,6 +161,21 @@
 
 #? (:cljs (cljs.reader/register-tag-parser! 'ct/list read-edn-map))
 
+(extend-type CausalList
+  proto/CausalTree
+  (get-uuid [this] (::s/uuid (.-ct this)))
+  (get-ts [this] (::s/lamport-ts (.-ct this)))
+  (get-site-id [this] (::s/site-id (.-ct this)))
+  (get-weave [this] (::s/weave (.-ct this)))
+  (insert [this node]
+    (CausalList. (s/insert weave (.-ct this) node)))
+  (append [this cause value]
+    (CausalList. (s/append weave (.-ct this) cause value)))
+  (weft [this ids-to-cut-yarns]
+    (CausalList. (s/weft weave new-causal-tree (.-ct this) ids-to-cut-yarns)))
+  (causal-merge [causal-list1 causal-list2]
+    (CausalList. (s/merge-trees weave (.-ct causal-list1) (.-ct causal-list2)))))
+
 (defn new-causal-list []
   (CausalList. (new-causal-tree)))
 
@@ -168,7 +184,9 @@
     (def ct (atom (new-causal-list)))
     (swap! ct conj "f" "o" "o")
     (swap! ct conj " ")
-    (swap! ct conj "b" "a" "r"))
+    (swap! ct conj "b" "a" "r")
+    (swap! ct proto/append (first (second (proto/get-weave @ct))) ::s/delete)
+    (swap! ct proto/append (first (second (proto/get-weave @ct))) "g"))
   (count @ct)
   (hash @ct)
   (str @ct)
@@ -183,8 +201,8 @@
   (type->str (type @ct))
   (str (type @ct))
   (instance? causal_tree.list.CausalList @ct)
-  (s/ct->edn @ct :deref-atoms false)
-  (s/ct->edn @ct)
+  (s/causal->edn @ct :deref-atoms false)
+  (s/causal->edn @ct)
   (vec @ct)
   (first @ct)
   (ffirst @ct)

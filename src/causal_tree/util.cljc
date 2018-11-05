@@ -10,7 +10,7 @@
   ([a b & more]
    (and (<< a b) (apply << b more))))
 
-(defn guid
+(defn uid
   "Returns a globally unique ID, encoded to take up as little
   space as possible. See this site for help picking a reasonable
   length https://zelark.github.io/nano-id-cc/. The default for

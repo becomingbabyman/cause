@@ -1,6 +1,7 @@
 (ns causal-tree.map
   (:require [causal-tree.util :as u :refer [<<]]
             [causal-tree.shared :as s]
+            [causal-tree.protocols :as proto]
             #? (:cljs [cljs.reader]))
   #? (:clj
       (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
@@ -11,7 +12,7 @@
 (defn new-causal-tree []
   {::s/type ::s/map
    ::s/lamport-ts 0
-   ::s/guid (u/guid)
+   ::s/uuid (u/uid)
    ::s/site-id (s/site-id)
    ::s/nodes {}
    ::s/yarns {}
@@ -55,7 +56,7 @@
 (defn assoc-
   ([causal-tree k v]
    (if (not= v (get- causal-tree k)) ; don't set a key to the same value twice
-     (s/append causal-tree k v weave)
+     (s/append weave causal-tree k v)
      causal-tree))
   ([causal-tree k v & kvs]
    (apply assoc- (assoc- causal-tree k v) kvs)))
@@ -63,13 +64,13 @@
 (defn dissoc-
   ([causal-tree k]
    (if (get- causal-tree k) ; only delete keys that are already in the tree
-     (s/append causal-tree k ::s/delete weave)
+     (s/append weave causal-tree k ::s/delete)
      causal-tree))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- causal-tree k) ks)))
 
 (defn empty- [causal-tree]
-  (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/guid])))
+  (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/uuid])))
 
 #? (:clj
     (deftype CausalMap [ct]
@@ -91,24 +92,24 @@
           ;   to the same value? Or should all the nodes have to match?
       (equals [this o] (.equals (.ct this) o))
       (hashCode [this] (.hashCode (.ct this)))
-      (toString [this] (.toString (s/ct->edn (.ct this))))
+      (toString [this] (.toString (s/causal->edn (.ct this))))
 
       ILookup
       (valAt [this k] (get- (.ct this) k))
       (valAt [this k not-found] (or (.valAt this k) not-found))
 
       IMapIterable
-      (keyIterator [this] (.keyIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
-      (valIterator [this] (.valIterator ^IMapIterable (s/ct->edn (.ct this) :deref-atoms false)))
+      (keyIterator [this] (.keyIterator ^IMapIterable (s/causal->edn (.ct this) :deref-atoms false)))
+      (valIterator [this] (.valIterator ^IMapIterable (s/causal->edn (.ct this) :deref-atoms false)))
 
       IKVReduce
-      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/ct->edn (.ct this) :deref-atoms false) f init))
+      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/causal->edn (.ct this) :deref-atoms false) f init))
 
       IHashEq
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
 
       Seqable
-      (seq [this] (.seq ^Seqable (s/ct->edn (.ct this) :deref-atoms false)))
+      (seq [this] (.seq ^Seqable (s/causal->edn (.ct this) :deref-atoms false)))
 
       IFn
       (invoke [this k] (.invoke ^IFn (.ct this) k))
@@ -141,7 +142,7 @@
       (-dissoc [this k] (CausalMap. (dissoc- (.-ct this) k)))
 
       IKVReduce
-      (-kv-reduce [this f init] (-kv-reduce (s/ct->edn (.-ct this) :deref-atoms false) f init))
+      (-kv-reduce [this f init] (-kv-reduce (s/causal->edn (.-ct this) :deref-atoms false) f init))
 
       IEquiv
       (-equiv [this other] (-equiv (.-ct this) other))
@@ -152,7 +153,7 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#ct/map " (pr-str {:ct->edn (s/ct->edn (.-ct o))
+        (-write writer (str "#ct/map " (pr-str {:causal->edn (s/causal->edn (.-ct o))
                                                 :ct (.-ct o)}))))
 
       IHash
@@ -163,10 +164,10 @@
       (-invoke [this o not-found] ((.-ct this) o not-found))
 
       ISeqable
-      (-seq [this] (-seq (s/ct->edn (.-ct this) :deref-atoms false)))
+      (-seq [this] (-seq (s/causal->edn (.-ct this) :deref-atoms false)))
 
       Object
-      (toString [this] (.toString (s/ct->edn (.-ct this))))
+      (toString [this] (.toString (s/causal->edn (.-ct this))))
 
       IMeta
       (-meta [this] (-meta (.-ct this)))
@@ -174,8 +175,8 @@
       IWithMeta
       (-with-meta [this meta] (CausalMap. (-with-meta (.-ct this) meta)))))
 
-#? (:clj (defmethod print-method CausalMap [o ^java.io.Writer w]
-           (.write w (str "#ct/map " (pr-str {:ct->edn (s/ct->edn (.ct o))
+#? (:clj (defmethod print-method CausalMap [^CausalMap o ^java.io.Writer w]
+           (.write w (str "#ct/map " (pr-str {:causal->edn (s/causal->edn (.ct o))
                                               :ct (.ct o)})))))
 
 (defn read-edn-map
@@ -184,6 +185,21 @@
     (CausalMap. ct)))
 
 #? (:cljs (cljs.reader/register-tag-parser! 'ct/map read-edn-map))
+
+(extend-type CausalMap
+  proto/CausalTree
+  (get-uuid [this] (::s/uuid (.-ct this)))
+  (get-ts [this] (::s/lamport-ts (.-ct this)))
+  (get-site-id [this] (::s/site-id (.-ct this)))
+  (get-weave [this] (::s/weave (.-ct this)))
+  (insert [this node]
+    (CausalMap. (s/insert weave (.-ct this) node)))
+  (append [this cause value]
+    (CausalMap. (s/append weave (.-ct this) cause value)))
+  (weft [this ids-to-cut-yarns]
+    (CausalMap. (s/weft weave new-causal-tree (.-ct this) ids-to-cut-yarns)))
+  (causal-merge [causal-map1 causal-map2]
+    (CausalMap. (s/merge-trees weave (.-ct causal-map1) (.-ct causal-map2)))))
 
 (defn new-causal-map []
   (CausalMap. (new-causal-tree)))
@@ -196,6 +212,8 @@
     (swap! ct dissoc :foo)
     (swap! ct assoc :foo "bop")
     (swap! ct assoc :flip "flop"))
+  (proto/get-uuid @ct)
+  (proto/append @ct :wat "sup")
   (swap! ct dissoc :fizz)
   (count @ct)
   (hash @ct)
@@ -203,8 +221,13 @@
   (deref ct)
   (count- (.ct @ct))
   (empty @ct)
-  (def ct2 (atom @ct))
-  (swap! ct2 assoc :foo "bing")
+  (do
+    (def ct2 (atom @ct))
+    (swap! ct2 proto/insert (s/node 6 (s/site-id) :foo "boo"))
+    (swap! ct2 proto/insert (s/node 3 (s/site-id) :flip "grip"))
+    (swap! ct2 proto/insert (s/node 23 (s/site-id) :stew "art"))
+    (swap! ct assoc :flim "flam")
+    (proto/causal-merge @ct @ct2))
   (swap! ct assoc :ct2 ct2)
   (= @ct @ct2)
   (deref ct)
@@ -212,15 +235,15 @@
   (conj @ct {:a 2 :b 3 :foo "wat"})
   (get @ct :fizz)
   (:foo @ct)
-  (@ct ::s/guid)
+  (@ct ::s/uuid)
   (get @ct :gloop "glop")
   (keys @ct)
   (vals @ct)
   (type->str (type @ct))
   (str (type @ct))
   (instance? causal_tree.map.CausalMap @ct)
-  (s/ct->edn @ct :deref-atoms false)
-  (s/ct->edn @ct)
+  (s/causal->edn @ct :deref-atoms false)
+  (s/causal->edn @ct)
   (seq @ct)
   (first @ct)
   (ffirst @ct)

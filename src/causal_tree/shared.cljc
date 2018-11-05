@@ -1,6 +1,6 @@
 (ns causal-tree.shared
   (:require
-   [causal-tree.util :as u :refer [<< guid]]
+   [causal-tree.util :as u :refer [<<]]
    [clojure.spec.alpha :as spec]
    [clojure.spec.gen.alpha :as gen]))
 
@@ -20,7 +20,7 @@
 (def speical-keywords #{::delete})
 (def root-id [0 "0"])
 (def root-node [root-id nil nil])
-(def guid-length 21)
+(def uuid-length 21)
 (def site-id-length 13)
 
 (defn gen-string [length]
@@ -29,8 +29,8 @@
 (spec/def ::type types)
 (spec/def ::lamport-ts nat-int?) ; AKA the index in a yarn
 ; TODO: should a wall-clock-ts be added? If a central Datomic DB is used then nodes will get a wall clock ts based on when they were synced to the server...
-(spec/def ::guid (spec/with-gen (spec/and string? #(= (count %) guid-length))
-                                #(gen-string guid-length)))
+(spec/def ::uuid (spec/with-gen (spec/and string? #(= (count %) uuid-length))
+                                #(gen-string uuid-length)))
 (spec/def ::site-id (spec/with-gen (spec/and string? #(or
                                                        (= (count %) site-id-length)
                                                        (= % "0")))
@@ -64,10 +64,10 @@
                    :list-weave (spec/coll-of ::node :gen-max 3) ; ordered vector of operations in the order of their output
                    :map-weave (spec/map-of ::key (spec/coll-of ::node :gen-max 3) :gen-max 3))) ; map of ordered vectors corresponding to keys
 
-(spec/def ::causal-tree (spec/keys :req [::nodes ::lamport-ts ::guid ::site-id]
+(spec/def ::causal-tree (spec/keys :req [::nodes ::lamport-ts ::uuid ::site-id]
                                    :opt [::yarns ::weave]))
 
-(defn site-id [] (u/guid site-id-length))
+(defn site-id [] (u/uid site-id-length))
 
 (defn node
   ([[k v]] ; maps the keys / values in the ::nodes map back to nodes
@@ -108,7 +108,7 @@
   "Inserts an arbitrary node from any site and any point in time. If the
   node's ts is greater than the local ts then the local ts will be
   fastforwared to match."
-  [causal-tree node weave-fn]
+  [weave-fn causal-tree node]
   (if-let [existing-node-body (get-in causal-tree [::nodes (first node)])]
     (if (= (rest node) existing-node-body)
       causal-tree
@@ -130,10 +130,10 @@
 (defn append
   "Similar to insert, but automatically calculates node id based on the
   local site-id and lamport-ts."
-  [causal-tree cause value weave-fn]
+  [weave-fn causal-tree cause value]
   (let [ct2 (update-in causal-tree [::lamport-ts] inc)
         node (node (::lamport-ts ct2) (::site-id ct2) cause value)]
-    (insert ct2 node weave-fn)))
+    (insert weave-fn ct2 node)))
 
 (defn refresh-ts
   "Refreshes the ::lamport-ts to make sure it's the max value in the tree.
@@ -154,7 +154,7 @@
 (defn refresh-caches
   "Replaces everything but ::nodes and ::site-id with refreshed caches
    of ::weave ::yarns etc. Useful when loading in ::nodes."
-  [causal-tree weave-fn]
+  [weave-fn causal-tree]
   (->> causal-tree
        (spin)
        (refresh-ts)
@@ -168,8 +168,9 @@
   you time travel. Combinations of Ids that do not preserve causality
   are invalid and will result in gibberish trees."
   ; TODO: throw on ids that do not preserve causality. This likely invloves writing a O(n) un-weave function that can rollback a weave to the specified weft and throw if the rollback breaks causality...
-  [causal-tree initial-ids new-causal-tree-fn weave-fn]
-  (let [filtered-ids (filter #(not= root-id %) initial-ids)]
+  [weave-fn new-causal-tree-fn causal-tree ids-to-cut-yarns]
+  ; TODO: filter or throw if more than one id per site.
+  (let [filtered-ids (filter #(not= root-id %) ids-to-cut-yarns)]
     (loop [new-ct (new-causal-tree-fn)
            id (first filtered-ids)
            more-ids (rest filtered-ids)]
@@ -215,7 +216,7 @@
           (= (first nm) (second nr))) nil ; and it deletes this node, return nil
      :else (ct-opts->edn (last nm) opts)))) ; Return the value.
 
-(defn ct->edn
+(defn causal->edn
   "Takes a value. If it's a causal tree it returns the data representing the
   current state of the tree. If it's not a causal tree it just returns the value."
   [ct-or-v & {:keys [deref-atoms] :or {deref-atoms true} :as opts}]
@@ -227,17 +228,17 @@
     (if deref-atoms
       (ct-opts->edn (deref ct-or-v) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
       ct-or-v)
-    ; TODO: if ct->edn pulled into another ns then this class could be imported and instance? could be used rather than a string comparison
+    ; TODO: if causal->edn pulled into another ns, like core, then these classes could be imported and instance? could be used rather than a string comparison
     #? (:clj (= "class causal_tree.map.CausalMap" (str (type ct-or-v)))
              :cljs (= "causal-tree.map/CausalMap" (type->str (type ct-or-v))))
-    (ct-opts->edn #? (:clj (.ct ct-or-v) :cljs (.-ct ct-or-v)) opts)
+    (ct-opts->edn (.-ct ct-or-v) opts)
     #? (:clj (= "class causal_tree.list.CausalList" (str (type ct-or-v)))
              :cljs (= "causal-tree.list/CausalList" (type->str (type ct-or-v))))
-    (ct-opts->edn #? (:clj (.ct ct-or-v) :cljs (.-ct ct-or-v)) opts)
+    (ct-opts->edn (.-ct ct-or-v) opts)
     :else ct-or-v))
 
 (defn ct-opts->edn [ct opts]
-  (apply ct->edn ct (flatten (seq (remove nil? opts)))))
+  (apply causal->edn ct (flatten (seq (remove nil? opts)))))
 
 ; TODO: should this take whole trees or a tree and nodes?
 ;   Nodes are simpler, can be sorted, and merged in with O(n*m)
@@ -245,10 +246,21 @@
 ;   there will be duplicate nodes either way, so a diff will
 ;   always need to be calculated...
 (defn merge-trees
-  "Merges two or more causal-trees into one."
-  ([weave-fn causal-tree1 causal-tree2 & more]
-   (apply merge-trees weave-fn
-          (merge-trees weave-fn causal-tree1 causal-tree2)
-          more))
+  "Merges two causal-trees into one."
   ([weave-fn causal-tree1 causal-tree2]
-   (println "TODO")))
+   (cond
+     (not= (::type causal-tree1) (::type causal-tree2))
+     (throw (ex-info "Causal type missmatch. Merge not allowed."
+                     {:causes #{:type-missmatch}
+                      :types [(::type causal-tree1) (::type causal-tree2)]}))
+     (not= (::uuid causal-tree1) (::uuid causal-tree2))
+     (throw (ex-info "Causal UUID missmatch. Merge not allowed."
+                     {:causes #{:uuid-missmatch}
+                      :uuids [(::uuid causal-tree1) (::uuid causal-tree2)]}))
+     :else (->> (::nodes causal-tree2)
+                (map node)
+                (reduce (partial insert weave-fn) causal-tree1)))))
+                ; TODO: implement deep merge of cts in values.
+                ;       This includes atoms.
+                ;       Preserve the value types in causal-tree1. E.g. once merged atoms should still be atoms.
+                ; TODO: improve performance.
