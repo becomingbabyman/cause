@@ -260,7 +260,7 @@
      :else (->> (::nodes causal-tree2)
                 (map node)
                 (reduce (partial insert weave-fn) causal-tree1)))))
-                ; TODO: implement deep merge of cts in values.
+                ; TODO: MAYBE: implement deep merge of cts in values.
                 ;       This includes atoms.
                 ;       Preserve the value types in causal-tree1. E.g. once merged atoms should still be atoms.
                 ; TODO: improve performance.
