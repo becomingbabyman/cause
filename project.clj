@@ -1,6 +1,6 @@
-(defproject causal-tree "0.0.1"
+(defproject cause "0.1.0"
             :description "An EDN-like CRDT (Causal Tree) for Clojure(Script) that automatically tracks history and resolves conflicts."
-            :url "https://github.com/smothers/causal-tree"
+            :url "https://github.com/smothers/cause"
 
             :license {:name "MIT License"
                       :url "https://opensource.org/licenses/MIT"}
@@ -45,7 +45,7 @@
             {:builds
              [{:id "browser-test"
                :source-paths ["src" "test"]
-               :compiler {:main causal-tree.runner
+               :compiler {:main cause.runner
                           :output-to "target/browser-test/browser-test.js"
                           :output-dir "target/browser-test/out"
                           :optimizations :none
@@ -53,7 +53,7 @@
               {:id "dev"
                :figwheel {:open-urls ["http://localhost:3449"]}
                :source-paths ["src"]
-               :compiler {:main causal-tree.core
+               :compiler {:main cause.core
                           :asset-path "js/out"
                           :output-to "resources/public/js/main.js"
                           :output-dir "resources/public/js/out"

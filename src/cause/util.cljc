@@ -1,6 +1,5 @@
-(ns causal-tree.util
-  (:require
-   [nano-id.core :refer [nano-id]]))
+(ns cause.util
+  (:require [nano-id.core :refer [nano-id]]))
 
 (defn <<
   "Return non-nil if runs of any type are in

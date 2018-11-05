@@ -1,11 +1,10 @@
-(ns causal-tree.list-test
-  (:require
-   [causal-tree.shared :as s]
-   [causal-tree.core :as c]
-   [causal-tree.list :as c-list]
-   [clojure.string :as string]
-   [clojure.test :refer [deftest is]]
-   #? (:clj [criterium.core :refer [quick-bench]])))
+(ns cause.list-test
+  (:require [cause.shared :as s]
+            [cause.core :as c]
+            [cause.list :as c-list]
+            [clojure.string :as string]
+            [clojure.test :refer [deftest is]]
+            #? (:clj [criterium.core :refer [quick-bench]])))
 
 (def simple-values
   (concat [c/delete c/delete c/delete \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))

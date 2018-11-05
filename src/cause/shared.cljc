@@ -1,8 +1,7 @@
-(ns causal-tree.shared
-  (:require
-   [causal-tree.util :as u :refer [<<]]
-   [clojure.spec.alpha :as spec]
-   [clojure.spec.gen.alpha :as gen]))
+(ns cause.shared
+  (:require [cause.util :as u :refer [<<]]
+            [clojure.spec.alpha :as spec]
+            [clojure.spec.gen.alpha :as gen]))
 
 ; node:   the smallest unit of causation. unique Id, Value, Cause.
 ; nodes:  a map of all nodes by their Ids. This is the canonical store for all nodes in a tree.
@@ -220,7 +219,7 @@
   "Takes a value. If it's a causal tree it returns the data representing the
   current state of the tree. If it's not a causal tree it just returns the value."
   [ct-or-v & {:keys [deref-atoms] :or {deref-atoms true} :as opts}]
-  ; (println ">>>" deref-atoms (type->str (type ct-or-v)) (= "causal-tree.map/CausalMap" (type->str (type ct-or-v))))
+  ; (println ">>>" deref-atoms (type->str (type ct-or-v)) (= "cause.map/CausalMap" (type->str (type ct-or-v))))
   (cond
     (= ::map (::type ct-or-v)) (ct-map->edn ct-or-v opts)
     (= ::list (::type ct-or-v)) (ct-list->edn ct-or-v opts)
@@ -229,11 +228,11 @@
       (ct-opts->edn (deref ct-or-v) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
       ct-or-v)
     ; TODO: if causal->edn pulled into another ns, like core, then these classes could be imported and instance? could be used rather than a string comparison
-    #? (:clj (= "class causal_tree.map.CausalMap" (str (type ct-or-v)))
-             :cljs (= "causal-tree.map/CausalMap" (type->str (type ct-or-v))))
+    #? (:clj (= "class cause.map.CausalMap" (str (type ct-or-v)))
+             :cljs (= "cause.map/CausalMap" (type->str (type ct-or-v))))
     (ct-opts->edn (.-ct ct-or-v) opts)
-    #? (:clj (= "class causal_tree.list.CausalList" (str (type ct-or-v)))
-             :cljs (= "causal-tree.list/CausalList" (type->str (type ct-or-v))))
+    #? (:clj (= "class cause.list.CausalList" (str (type ct-or-v)))
+             :cljs (= "cause.list/CausalList" (type->str (type ct-or-v))))
     (ct-opts->edn (.-ct ct-or-v) opts)
     :else ct-or-v))
 

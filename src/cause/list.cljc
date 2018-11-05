@@ -1,9 +1,8 @@
-(ns causal-tree.list
-  (:require
-   [causal-tree.util :as u :refer [<<]]
-   [causal-tree.shared :as s]
-   [causal-tree.protocols :as proto]
-   #? (:cljs [cljs.reader]))
+(ns cause.list
+  (:require [cause.util :as u :refer [<<]]
+            [cause.shared :as s]
+            [cause.protocols :as proto]
+            #? (:cljs [cljs.reader]))
   #? (:clj
       (:import (clojure.lang IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
                (java.io Writer)
@@ -132,8 +131,8 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#ct/list " (pr-str {:causal->edn (s/causal->edn (.-ct o))
-                                                 :ct (.-ct o)}))))
+        (-write writer (str "#causal/list " (pr-str {:causal->edn (s/causal->edn (.-ct o))
+                                                     :ct (.-ct o)}))))
 
       IHash
       (-hash [this] (-hash (.-ct this)))
@@ -151,15 +150,15 @@
       (-with-meta [this meta] (CausalList. (-with-meta (.-ct this) meta)))))
 
 #? (:clj (defmethod print-method CausalList [^CausalList o ^java.io.Writer w]
-           (.write w (str "#ct/list " (pr-str {:causal->edn (s/causal->edn (.ct o))
-                                               :ct (.ct o)})))))
+           (.write w (str "#causal/list " (pr-str {:causal->edn (s/causal->edn (.ct o))
+                                                   :ct (.ct o)})))))
 
 (defn read-edn-map
   [read-object]
   (let [[ct] read-object]
     (CausalList. ct)))
 
-#? (:cljs (cljs.reader/register-tag-parser! 'ct/list read-edn-map))
+#? (:cljs (cljs.reader/register-tag-parser! 'causal/list read-edn-map))
 
 (extend-type CausalList
   proto/CausalTree
@@ -200,7 +199,7 @@
   (get @ct 0)
   (type->str (type @ct))
   (str (type @ct))
-  (instance? causal_tree.list.CausalList @ct)
+  (instance? cause.list.CausalList @ct)
   (s/causal->edn @ct :deref-atoms false)
   (s/causal->edn @ct)
   (vec @ct)

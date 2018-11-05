@@ -1,5 +1,5 @@
 {
-  "name": "causal-tree",
+  "name": "cause",
   "devDependencies": {
     "karma": "^3.1.1",
     "karma-chrome-launcher": "^2.2.0",

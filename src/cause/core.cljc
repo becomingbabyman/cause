@@ -1,9 +1,8 @@
-(ns causal-tree.core
-  (:require
-   [causal-tree.shared :as s]
-   [causal-tree.protocols :as proto]
-   [causal-tree.list :as c-list]
-   [causal-tree.map :as c-map]))
+(ns cause.core
+  (:require [cause.shared :as s]
+            [cause.protocols :as proto]
+            [cause.list :as c-list]
+            [cause.map :as c-map]))
 
 ; Nodes are the building blocks of causal data types.
 (def node s/node)

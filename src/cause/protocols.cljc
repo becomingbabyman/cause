@@ -1,4 +1,4 @@
-(ns causal-tree.protocols)
+(ns cause.protocols)
 
 (defprotocol CausalTree
   "The CvRDT related functions that a causal collection type must implement."

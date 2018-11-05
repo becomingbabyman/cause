@@ -1,8 +1,7 @@
-(ns causal-tree.map-test
-  (:require
-   [causal-tree.core :as c]
-   [clojure.string :as string]
-   [clojure.test :refer [deftest is]]))
+(ns cause.map-test
+  (:require [cause.core :as c]
+            [clojure.string :as string]
+            [clojure.test :refer [deftest is]]))
 
 (deftest map-test
   (-> (c/causal-map)
