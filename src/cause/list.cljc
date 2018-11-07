@@ -175,13 +175,14 @@
   (causal-merge [causal-list1 causal-list2]
     (CausalList. (s/merge-trees weave (.-ct causal-list1) (.-ct causal-list2)))))
 
-(defn new-causal-list []
-  (CausalList. (new-causal-tree)))
+(defn new-causal-list
+  "Creates a new causal list containing the items."
+  [& items]
+  (apply conj (CausalList. (new-causal-tree)) items))
 
 (comment
   (do
-    (def ct (atom (new-causal-list)))
-    (swap! ct conj "f" "o" "o")
+    (def ct (atom (new-causal-list "f" "o" "o")))
     (swap! ct conj " ")
     (swap! ct conj "b" "a" "r")
     (swap! ct proto/append (first (second (proto/get-weave @ct))) ::s/delete)

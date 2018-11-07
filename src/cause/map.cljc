@@ -204,9 +204,15 @@
 (defn new-causal-map []
   (CausalMap. (new-causal-tree)))
 
+(defn new-causal-map
+  "Creates a new causal map containing the alternating keys and values."
+  [& kvs]
+  (let [cm (CausalMap. (new-causal-tree))]
+    (if kvs (apply assoc cm kvs) cm)))
+
 (comment
   (do
-    (def ct (atom (new-causal-map)))
+    (def ct (atom (new-causal-map :yo "lo")))
     (swap! ct assoc :foo "bar")
     (swap! ct assoc :fizz "bang")
     (swap! ct dissoc :foo)

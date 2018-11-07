@@ -69,6 +69,7 @@
 (defn site-id [] (u/uid site-id-length))
 
 (defn node
+  "Helper function to create a node for insertion into a causal collection."
   ([[k v]] ; maps the keys / values in the ::nodes map back to nodes
    (into [k] v))
   ([lamport-ts site-id cause value]

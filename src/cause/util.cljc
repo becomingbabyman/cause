@@ -43,3 +43,12 @@
   ([coll val] (if-let [i (sorted-insertion-index coll val {:uniq true})]
                 (insert coll i val) coll))
   ([coll i val] (vec (concat (take i coll) [val] (drop i coll)))))
+
+(defmacro redef
+  "Moves a symbol to the current ns, preserving the docstring and arglists."
+  [symbol value]
+  `(let [m# (meta (var ~value))]
+     (def ~symbol ~value)
+     (alter-meta! #'~symbol #(assoc % :doc (:doc m#)
+                                    :arglists (:arglists m#)))
+     #'~symbol))
