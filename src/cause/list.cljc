@@ -87,10 +87,26 @@
 (defn empty- [causal-tree]
   (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/uuid])))
 
+(defn causal-list->edn
+  "Returns the current state of the tree as edn. E.g. a tree of chars
+  will materialize as a string. This is mostly for testing and pretty
+  printing. In most cases it's prefferable to work with the whole tree."
+  ([causal-tree opts]
+   (->> (::s/weave causal-tree)
+        (partition 3 1 nil)
+        (keep (partial causal-list->edn causal-tree opts))))
+        ; (apply str)))
+  ([causal-tree opts [nl nm nr]]
+   (cond
+     (= ::s/delete (last nm)) nil ; Don't return deletes.
+     (and (= ::s/delete (last nr)) ; If the next node is a delete
+          (= (first nm) (second nr))) nil ; and it deletes this node, return nil
+     :else (s/causal->edn (last nm) opts)))) ; Return the value.
+
 #? (:clj
     (deftype CausalList [ct]
       Counted
-      (count [this] (.count (s/causal->edn (.ct this) :deref-atoms false)))
+      (count [this] (.count (s/causal->edn this {:deref-atoms false})))
 
       IPersistentCollection
       (cons [this o] (CausalList. (conj- (.ct this) o)))
@@ -102,13 +118,13 @@
           ;   to the same value? Or should all the nodes have to match?
       (equals [this o] (.equals (.ct this) o))
       (hashCode [this] (.hashCode (.ct this)))
-      (toString [this] (.toString (s/causal->edn (.ct this))))
+      (toString [this] (.toString (s/causal->edn this)))
 
       IHashEq
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
 
       Seqable
-      (seq [this] (.seq ^Seqable (s/causal->edn (.ct this) :deref-atoms false)))
+      (seq [this] (.seq ^Seqable (s/causal->edn this {:deref-atoms false})))
 
       IObj
       (withMeta [this meta] (CausalList. (with-meta ^IObj (.ct this) meta)))
@@ -118,7 +134,7 @@
     :cljs
     (deftype CausalList [ct]
       ICounted
-      (-count [this] (-count (vec (s/causal->edn (.-ct this) :deref-atoms false))))
+      (-count [this] (-count (vec (s/causal->edn this {:deref-atoms false}))))
 
       IEmptyableCollection
       (-empty [this] (CausalList. (empty- (.-ct this))))
@@ -131,17 +147,17 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#causal/list " (pr-str {:causal->edn (s/causal->edn (.-ct o))
+        (-write writer (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
                                                      :ct (.-ct o)}))))
 
       IHash
       (-hash [this] (-hash (.-ct this)))
 
       ISeqable
-      (-seq [this] (-seq (s/causal->edn (.-ct this) :deref-atoms false)))
+      (-seq [this] (-seq (s/causal->edn this {:deref-atoms false})))
 
       Object
-      (toString [this] (.toString (s/causal->edn (.-ct this))))
+      (toString [this] (.toString (s/causal->edn this)))
 
       IMeta
       (-meta [this] (-meta (.-ct this)))
@@ -150,7 +166,7 @@
       (-with-meta [this meta] (CausalList. (-with-meta (.-ct this) meta)))))
 
 #? (:clj (defmethod print-method CausalList [^CausalList o ^java.io.Writer w]
-           (.write w (str "#causal/list " (pr-str {:causal->edn (s/causal->edn (.ct o))
+           (.write w (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
                                                    :ct (.ct o)})))))
 
 (defn read-edn-map
@@ -172,8 +188,12 @@
     (CausalList. (s/append weave (.-ct this) cause value)))
   (weft [this ids-to-cut-yarns]
     (CausalList. (s/weft weave new-causal-tree (.-ct this) ids-to-cut-yarns)))
-  (causal-merge [causal-list1 causal-list2]
-    (CausalList. (s/merge-trees weave (.-ct causal-list1) (.-ct causal-list2)))))
+  (causal-merge [causal-list1 ^CausalList causal-list2]
+    (CausalList. (s/merge-trees weave (.-ct causal-list1) (.-ct causal-list2))))
+
+  proto/CausalTo
+  (causal->edn [causal opts]
+    (causal-list->edn (.-ct causal) opts)))
 
 (defn new-causal-list
   "Creates a new causal list containing the items."
@@ -201,7 +221,7 @@
   (type->str (type @ct))
   (str (type @ct))
   (instance? cause.list.CausalList @ct)
-  (s/causal->edn @ct :deref-atoms false)
+  (s/causal->edn @ct {:deref-atoms false})
   (s/causal->edn @ct)
   (vec @ct)
   (first @ct)

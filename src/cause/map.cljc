@@ -72,6 +72,17 @@
 (defn empty- [causal-tree]
   (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/uuid])))
 
+(defn causal-map->edn
+  "Returns the current state of the tree as edn. E.g. a tree of ks & vs
+  will materialize as a map. This is mostly for testing and pretty
+  printing. In most cases it's prefferable to work with the whole tree."
+  ([causal-tree opts]
+   (reduce (fn [acc [k [[_ v]]]]
+             (if (= v ::s/delete)
+               acc
+               (assoc acc k (s/causal->edn v opts))))
+           {} (::s/weave causal-tree))))
+
 #? (:clj
     (deftype CausalMap [ct]
       Counted
@@ -92,24 +103,24 @@
           ;   to the same value? Or should all the nodes have to match?
       (equals [this o] (.equals (.ct this) o))
       (hashCode [this] (.hashCode (.ct this)))
-      (toString [this] (.toString (s/causal->edn (.ct this))))
+      (toString [this] (.toString (s/causal->edn this)))
 
       ILookup
       (valAt [this k] (get- (.ct this) k))
       (valAt [this k not-found] (or (.valAt this k) not-found))
 
       IMapIterable
-      (keyIterator [this] (.keyIterator ^IMapIterable (s/causal->edn (.ct this) :deref-atoms false)))
-      (valIterator [this] (.valIterator ^IMapIterable (s/causal->edn (.ct this) :deref-atoms false)))
+      (keyIterator [this] (.keyIterator ^IMapIterable (s/causal->edn this {:deref-atoms false})))
+      (valIterator [this] (.valIterator ^IMapIterable (s/causal->edn this {:deref-atoms false})))
 
       IKVReduce
-      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/causal->edn (.ct this) :deref-atoms false) f init))
+      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/causal->edn this {:deref-atoms false}) f init))
 
       IHashEq
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
 
       Seqable
-      (seq [this] (.seq ^Seqable (s/causal->edn (.ct this) :deref-atoms false)))
+      (seq [this] (.seq ^Seqable (s/causal->edn this {:deref-atoms false})))
 
       IFn
       (invoke [this k] (.invoke ^IFn (.ct this) k))
@@ -142,7 +153,7 @@
       (-dissoc [this k] (CausalMap. (dissoc- (.-ct this) k)))
 
       IKVReduce
-      (-kv-reduce [this f init] (-kv-reduce (s/causal->edn (.-ct this) :deref-atoms false) f init))
+      (-kv-reduce [this f init] (-kv-reduce (s/causal->edn this {:deref-atoms false}) f init))
 
       IEquiv
       (-equiv [this other] (-equiv (.-ct this) other))
@@ -153,7 +164,7 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#causal/map " (pr-str {:causal->edn (s/causal->edn (.-ct o))
+        (-write writer (str "#causal/map " (pr-str {:causal->edn (s/causal->edn o)
                                                     :ct (.-ct o)}))))
 
       IHash
@@ -164,10 +175,10 @@
       (-invoke [this o not-found] ((.-ct this) o not-found))
 
       ISeqable
-      (-seq [this] (-seq (s/causal->edn (.-ct this) :deref-atoms false)))
+      (-seq [this] (-seq (s/causal->edn this {:deref-atoms false})))
 
       Object
-      (toString [this] (.toString (s/causal->edn (.-ct this))))
+      (toString [this] (.toString (s/causal->edn this)))
 
       IMeta
       (-meta [this] (-meta (.-ct this)))
@@ -176,7 +187,7 @@
       (-with-meta [this meta] (CausalMap. (-with-meta (.-ct this) meta)))))
 
 #? (:clj (defmethod print-method CausalMap [^CausalMap o ^java.io.Writer w]
-           (.write w (str "#causal/map " (pr-str {:causal->edn (s/causal->edn (.ct o))
+           (.write w (str "#causal/map " (pr-str {:causal->edn (s/causal->edn o)
                                                   :ct (.ct o)})))))
 
 (defn read-edn-map
@@ -198,11 +209,12 @@
     (CausalMap. (s/append weave (.-ct this) cause value)))
   (weft [this ids-to-cut-yarns]
     (CausalMap. (s/weft weave new-causal-tree (.-ct this) ids-to-cut-yarns)))
-  (causal-merge [causal-map1 causal-map2]
-    (CausalMap. (s/merge-trees weave (.-ct causal-map1) (.-ct causal-map2)))))
+  (causal-merge [causal-map1 ^CausalMap causal-map2]
+    (CausalMap. (s/merge-trees weave (.-ct causal-map1) (.-ct causal-map2))))
 
-(defn new-causal-map []
-  (CausalMap. (new-causal-tree)))
+  proto/CausalTo
+  (causal->edn [causal opts]
+    (causal-map->edn (.-ct causal) opts)))
 
 (defn new-causal-map
   "Creates a new causal map containing the alternating keys and values."
@@ -218,6 +230,7 @@
     (swap! ct dissoc :foo)
     (swap! ct assoc :foo "bop")
     (swap! ct assoc :flip "flop"))
+  (s/causal->edn @ct)
   (proto/get-uuid @ct)
   (proto/append @ct :wat "sup")
   (swap! ct dissoc :fizz)
@@ -248,7 +261,7 @@
   (type->str (type @ct))
   (str (type @ct))
   (instance? cause.map.CausalMap @ct)
-  (s/causal->edn @ct :deref-atoms false)
+  (s/causal->edn @ct {:deref-atoms false})
   (s/causal->edn @ct)
   (seq @ct)
   (first @ct)

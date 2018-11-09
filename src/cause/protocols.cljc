@@ -25,3 +25,9 @@
     "Merge causal collections of the same type together. They must
     be the same tree (same uuid). Causality (sites, nodes,
     timestamps) should be the only differences between them."))
+
+(defprotocol CausalTo
+  (causal->edn [causal opts]
+    "Convert a causal collection into a traditional edn collection.
+    It will automatically deref atom values unless you pass the opt
+    `:deref-atoms false`"))

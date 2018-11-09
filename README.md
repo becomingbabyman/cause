@@ -4,21 +4,18 @@
 
 ## Development
 
-Test CLJ
-
+#### Test CLJ
 ```
 lein test
 ```
 
-Test CLJS
-
+#### Test CLJS
 ```
 npm install
 lein cljs-test
 ```
 
-Dev REPL / nREPL
-
+#### Dev REPL / nREPL
 ```
 lein repl
 

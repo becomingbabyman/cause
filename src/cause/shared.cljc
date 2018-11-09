@@ -1,7 +1,9 @@
 (ns cause.shared
   (:require [cause.util :as u :refer [<<]]
+            [cause.protocols :as proto]
             [clojure.spec.alpha :as spec]
-            [clojure.spec.gen.alpha :as gen]))
+            [clojure.spec.gen.alpha :as gen])
+  #? (:clj (:import (clojure.lang Atom))))
 
 ; node:   the smallest unit of causation. unique Id, Value, Cause.
 ; nodes:  a map of all nodes by their Ids. This is the canonical store for all nodes in a tree.
@@ -187,59 +189,6 @@
             (yarns->nodes)
             (weave-fn))))))
 
-(declare ct-opts->edn)
-
-(defn ct-map->edn
-  "Returns the current state of the tree as edn. E.g. a tree of ks & vs
-  will materialize as a map. This is mostly for testing and pretty
-  printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree opts]
-   (reduce (fn [acc [k [[_ v]]]]
-             (if (= v ::delete)
-               acc
-               (assoc acc k (ct-opts->edn v opts))))
-           {} (::weave causal-tree))))
-
-(defn ct-list->edn
-  "Returns the current state of the tree as edn. E.g. a tree of chars
-  will materialize as a string. This is mostly for testing and pretty
-  printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree opts]
-   (->> (::weave causal-tree)
-        (partition 3 1 nil)
-        (keep (partial ct-list->edn causal-tree opts))))
-        ; (apply str)))
-  ([causal-tree opts [nl nm nr]]
-   (cond
-     (= ::delete (last nm)) nil ; Don't return deletes.
-     (and (= ::delete (last nr)) ; If the next node is a delete
-          (= (first nm) (second nr))) nil ; and it deletes this node, return nil
-     :else (ct-opts->edn (last nm) opts)))) ; Return the value.
-
-(defn causal->edn
-  "Takes a value. If it's a causal tree it returns the data representing the
-  current state of the tree. If it's not a causal tree it just returns the value."
-  [ct-or-v & {:keys [deref-atoms] :or {deref-atoms true} :as opts}]
-  ; (println ">>>" deref-atoms (type->str (type ct-or-v)) (= "cause.map/CausalMap" (type->str (type ct-or-v))))
-  (cond
-    (= ::map (::type ct-or-v)) (ct-map->edn ct-or-v opts)
-    (= ::list (::type ct-or-v)) (ct-list->edn ct-or-v opts)
-    (= #? (:clj clojure.lang.Atom :cljs Atom) (type ct-or-v))
-    (if deref-atoms
-      (ct-opts->edn (deref ct-or-v) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
-      ct-or-v)
-    ; TODO: if causal->edn pulled into another ns, like core, then these classes could be imported and instance? could be used rather than a string comparison
-    #? (:clj (= "class cause.map.CausalMap" (str (type ct-or-v)))
-             :cljs (= "cause.map/CausalMap" (type->str (type ct-or-v))))
-    (ct-opts->edn (.-ct ct-or-v) opts)
-    #? (:clj (= "class cause.list.CausalList" (str (type ct-or-v)))
-             :cljs (= "cause.list/CausalList" (type->str (type ct-or-v))))
-    (ct-opts->edn (.-ct ct-or-v) opts)
-    :else ct-or-v))
-
-(defn ct-opts->edn [ct opts]
-  (apply causal->edn ct (flatten (seq (remove nil? opts)))))
-
 ; TODO: should this take whole trees or a tree and nodes?
 ;   Nodes are simpler, can be sorted, and merged in with O(n*m)
 ;   m being the number of nodes in the merge. It's likely that
@@ -264,3 +213,22 @@
                 ;       This includes atoms.
                 ;       Preserve the value types in causal-tree1. E.g. once merged atoms should still be atoms.
                 ; TODO: improve performance.
+
+(declare causal->edn)
+
+(extend-type Atom
+  proto/CausalTo
+  (causal->edn [this opts]
+    (if (:deref-atoms opts)
+      (causal->edn (deref this) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
+      this)))
+
+(defn causal->edn
+  "Takes a value. If it's a causal tree it returns the data representing the
+  current state of the tree. If it's not a causal tree it just returns the value."
+  ([causal]
+   (causal->edn causal {:deref-atoms true}))
+  ([causal opts]
+   (if (satisfies? proto/CausalTo causal)
+     (proto/causal->edn causal opts)
+     causal)))
