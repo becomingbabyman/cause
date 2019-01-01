@@ -73,8 +73,6 @@
                                                             (first nl) true)
                                                      seen-since-asap))))))))
 
-; Specialty helper functions
-
 (defn conj-
   ([causal-tree v & vs]
    (apply conj- (conj- causal-tree v) vs))
@@ -87,21 +85,24 @@
 (defn empty- [causal-tree]
   (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/uuid])))
 
+(defn deleted?
+  "Has a node been deleted or is it a delete?"
+  [node next-node-in-weave]
+  (or (= ::s/delete (last node))
+      (and (= ::s/delete (last next-node-in-weave))
+           (= (first node) (second next-node-in-weave)))))
+
 (defn causal-list->edn
   "Returns the current state of the tree as edn. E.g. a tree of chars
   will materialize as a string. This is mostly for testing and pretty
   printing. In most cases it's prefferable to work with the whole tree."
   ([causal-tree opts]
    (->> (::s/weave causal-tree)
-        (partition 3 1 nil)
+        (partition 2 1 [nil])
         (keep (partial causal-list->edn causal-tree opts))))
-        ; (apply str)))
-  ([causal-tree opts [nl nm nr]]
-   (cond
-     (= ::s/delete (last nm)) nil ; Don't return deletes.
-     (and (= ::s/delete (last nr)) ; If the next node is a delete
-          (= (first nm) (second nr))) nil ; and it deletes this node, return nil
-     :else (s/causal->edn (last nm) opts)))) ; Return the value.
+  ([causal-tree opts [n nr]]
+   (if (deleted? n nr) nil
+       (s/causal->edn (last n) opts))))
 
 #? (:clj
     (deftype CausalList [ct]

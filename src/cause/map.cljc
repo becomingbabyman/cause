@@ -42,8 +42,6 @@
                      (vec (concat left [[id v]] right)))
            (recur (conj left nr) (rest right))))))))
 
-; Specialty helper functions
-
 (defn get-
   ([causal-tree k]
    (last (first (get-in causal-tree [::s/weave k])))))
