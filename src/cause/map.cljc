@@ -29,7 +29,7 @@
   infrequently changed."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave {})
-           (map s/node (sort (::s/nodes causal-tree)))))
+           (map s/new-node (sort (::s/nodes causal-tree)))))
   ([causal-tree [id k v :as node]]
    (if (not (get-in causal-tree [::s/nodes id]))
      causal-tree
@@ -240,9 +240,9 @@
   (empty @ct)
   (do
     (def ct2 (atom @ct))
-    (swap! ct2 proto/insert (s/node 6 (s/site-id) :foo "boo"))
-    (swap! ct2 proto/insert (s/node 3 (s/site-id) :flip "grip"))
-    (swap! ct2 proto/insert (s/node 23 (s/site-id) :stew "art"))
+    (swap! ct2 proto/insert (s/new-node 6 (s/site-id) :foo "boo"))
+    (swap! ct2 proto/insert (s/new-node 3 (s/site-id) :flip "grip"))
+    (swap! ct2 proto/insert (s/new-node 23 (s/site-id) :stew "art"))
     (swap! ct assoc :flim "flam")
     (proto/causal-merge @ct @ct2))
   (swap! ct assoc :ct2 ct2)

@@ -26,7 +26,7 @@
                           (or (ffirst (last (get-in causal-tree
                                                     [::s/yarns site-id])))
                               0)))]
-     (c/node lamport-ts site-id cause value))))
+     (c/new-node lamport-ts site-id cause value))))
 
 (defn insert-rand-node
   ([causal-list] (c/insert causal-list (rand-node causal-list))))
@@ -47,58 +47,58 @@
                [[3 "9FyYzf9pum6E4"] [0 "0"] \r]
                [[4 "NwudSBdQg3Ru2"] [3 "9FyYzf9pum6E4"] \space]
                [[4 "9FyYzf9pum6E4"] [0 "0"] \d]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "xT_odlTBwTRNU"] [0 "0"] \space]
                [[2 "xT_odlTBwTRNU"] [0 "0"] \b]
                [[2 "NwudSBdQg3Ru2"] [1 "xT_odlTBwTRNU"] \q]
                [[2 "9FyYzf9pum6E4"] [1 "xT_odlTBwTRNU"] \space]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "Pz8iuNCXvVsYN"] [0 "0"] \o]
                [[2 "Pz8iuNCXvVsYN"] [1 "Pz8iuNCXvVsYN"] ::s/delete]
                [[3 "9FyYzf9pum6E4"] [2 "Pz8iuNCXvVsYN"] \u]
                [[2 "NwudSBdQg3Ru2"] [1 "Pz8iuNCXvVsYN"] \space]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \j]
                [[1 "VdIJLRISw~zgo"] [0 "0"] \w]
                [[1 "A~iIXinAXkGX7"] [0 "0"] ::s/delete]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \u]
                [[2 "W7XhooU1Hsw7E"] [1 "W7XhooU1Hsw7E"] \space]
                [[2 "7hLbMKLvcll_4"] [1 "W7XhooU1Hsw7E"] ::s/delete]
                [[1 "VdIJLRISw~zgo"] [0 "0"] \m]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "Ftbpo0oG7ZnpR"] [0 "0"] ::s/delete]
                [[1 "A~iIXinAXkGX7"] [0 "0"] ::s/delete]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "VdIJLRISw~zgo"] [0 "0"] ::s/delete]
                [[2 "A~iIXinAXkGX7"] [1 "VdIJLRISw~zgo"] "j"]
                [[3 "A~iIXinAXkGX7"] [0 "0"] "i"]
                [[1 "W7XhooU1Hsw7E"] [0 "0"] "s"]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 " f "] [0 "0"] ::s/delete]
                [[2 " z "] [1 " f "] " "]
                [[2 " f "] [0 "0"] "l"]
                [[2 " a "] [1 " f "] "v"]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 " f "] [0 "0"] ::s/delete]
                [[2 " f "] [0 "0"] ::s/delete]
                [[3 " a "] [2 " f "] "c"]
                [[2 " z "] [1 " f "] "r"]]
-        cl (reduce c/insert (c/causal-list) nodes)]
+        cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl)))
 
 (defn find-weave-inconsistencies
   ([] (find-weave-inconsistencies 9))
   ([max-steps]
-   (loop [cl (c/causal-list)
+   (loop [cl (c/new-causal-list)
           insertions (c/get-weave cl)
           step 0]
      (if (>= step max-steps)
@@ -133,14 +133,14 @@ respecting it." #" "))
   ([] (rand-weave-of-phrases 3))
   ([n-phrases]
    (let [starting-phrases (map #(str " <" % "> ") (repeatedly n-phrases rand-phrase))]
-     (loop [cl (c/causal-list)
+     (loop [cl (c/new-causal-list)
             insertions []
             phrase (first starting-phrases)
             phrases (rest starting-phrases)
             site-id (s/site-id)]
        (if (not-empty phrase)
          (let [cause (last (get-in (.-ct cl) [::s/yarns site-id]))
-               node  (c/node (inc (or (ffirst cause) 1)) site-id
+               node  (c/new-node (inc (or (ffirst cause) 1)) site-id
                              (or (first cause) s/root-id) (first phrase))]
                ; (rand-node cl site-id (first phrase))]
            (recur (c/insert cl node)
@@ -172,7 +172,7 @@ respecting it." #" "))
   (rand-phrase)
   (dissoc (rand-weave-of-phrases 3) :cl :insertions)
 
-  (def cl (atom (c/causal-list)))
+  (def cl (atom (c/new-causal-list)))
   (time (do (doall (repeatedly 50 #(swap! cl insert-rand-node))) nil))
   (quick-bench (do (insert-rand-node @cl) nil))
   (quick-bench (do (c/causal->edn @cl) nil)))

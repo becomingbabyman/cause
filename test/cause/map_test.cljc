@@ -4,12 +4,12 @@
             [clojure.test :refer [deftest is]]))
 
 (deftest map-test
-  (-> (c/causal-map)
+  (-> (c/new-causal-map)
       (assoc :foo "bar")
       (assoc :fizz "buzz")
       (assoc :fizz "bang")
       (dissoc :foo)
-      (assoc :list (swap! (atom (c/causal-list))
+      (assoc :list (swap! (atom (c/new-causal-list))
                           conj "a" "b" "c"))
       (c/causal->edn)
       (= {:fizz "bang" :list '("a" "b" "c")})

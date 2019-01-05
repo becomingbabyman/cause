@@ -2,7 +2,7 @@ classes/*
 target/*
 .cpcache/*
 node_modules/*
-.nrelp-port
+.nrepl-port
 .lein-failures
 .lein-repl-history
 .rebel_readline_history

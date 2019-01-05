@@ -14,7 +14,7 @@
                  :clojure.test.check/ret))
 
 (deftest spec-fdefs-pass
-  (is (get-in (first (stest/check `s/node)) [ret-key :pass?])))
+  (is (get-in (first (stest/check `s/new-node)) [ret-key :pass?])))
   ; TODO: switch to this once enumerate-namespace is added to cljs.spec.test.alpha
   ;   It's currently in master awaiting the next release: https://github.com/clojure/clojurescript/blame/master/src/main/cljs/cljs/spec/test/alpha.cljc#L25
   ; (->> (stest/enumerate-namespace 'cause.shared)

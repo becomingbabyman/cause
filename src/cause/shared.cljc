@@ -70,13 +70,13 @@
 
 (defn site-id [] (u/uid site-id-length))
 
-(defn node
+(defn new-node
   "Helper function to create a node for insertion into a causal collection."
   ([[k v]] ; maps the keys / values in the ::nodes map back to nodes
    (into [k] v))
   ([lamport-ts site-id cause value]
    [[lamport-ts site-id] cause value]))
-(spec/fdef node
+(spec/fdef new-node
            :args (spec/or
                   :arity-1 (spec/cat :node-kv-tuple (spec/tuple ::id (spec/tuple ::cause ::value)))
                   :arity-5 (spec/cat :lamport-ts ::lamport-ts
@@ -93,7 +93,7 @@
   entire tree will be traversed and (re)indexed."
   ([causal-tree]
    (loop [ct1 causal-tree
-          sorted-nodes (map node (sort (::nodes causal-tree)))]
+          sorted-nodes (map new-node (sort (::nodes causal-tree)))]
      (if (empty? sorted-nodes)
        ct1
        (recur (spin ct1 (first sorted-nodes))
@@ -134,7 +134,7 @@
   local site-id and lamport-ts."
   [weave-fn causal-tree cause value]
   (let [ct2 (update-in causal-tree [::lamport-ts] inc)
-        node (node (::lamport-ts ct2) (::site-id ct2) cause value)]
+        node (new-node (::lamport-ts ct2) (::site-id ct2) cause value)]
     (insert weave-fn ct2 node)))
 
 (defn refresh-ts
@@ -180,7 +180,7 @@
         (recur (as-> (get-in causal-tree [::yarns (second id)]) $
                      (take-while #(not= id (first %)) $)
                      (vec $)
-                     (conj $ (node [id (get-in causal-tree [::nodes id])]))
+                     (conj $ (new-node [id (get-in causal-tree [::nodes id])]))
                      (assoc-in new-ct [::yarns (second id)] $))
                (first more-ids) (rest more-ids))
         (-> new-ct
@@ -207,7 +207,7 @@
                      {:causes #{:uuid-missmatch}
                       :uuids [(::uuid causal-tree1) (::uuid causal-tree2)]}))
      :else (->> (::nodes causal-tree2)
-                (map node)
+                (map new-node)
                 (reduce (partial insert weave-fn) causal-tree1)))))
                 ; TODO: MAYBE: implement deep merge of cts in values.
                 ;       This includes atoms.

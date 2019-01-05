@@ -6,13 +6,13 @@
             [cause.map :as c-map]))
 
 ; Nodes are the building blocks of causal data types.
-(redef node s/node)
+(redef new-node s/new-node)
 
 (def ^{:doc "Insert this value to delete a cause."} delete ::s/delete)
 
 ; Causal collection types. These are convergent and EDN-like.
-(redef causal-list c-list/new-causal-list)
-(redef causal-map c-map/new-causal-map)
+(redef new-causal-list c-list/new-causal-list)
+(redef new-causal-map c-map/new-causal-map)
 
 ; Causal specific functions for causal collections.
 (redef insert proto/insert)
