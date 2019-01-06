@@ -23,7 +23,7 @@
          cause (rand-nth (keys (::s/nodes causal-tree)))
          lamport-ts (inc (max
                           (first cause)
-                          (or (ffirst (last (get-in causal-tree
+                          (or (ffirst (peek (get-in causal-tree
                                                     [::s/yarns site-id])))
                               0)))]
      (c/new-node lamport-ts site-id cause value))))
@@ -139,7 +139,7 @@ respecting it." #" "))
             phrases (rest starting-phrases)
             site-id (s/site-id)]
        (if (not-empty phrase)
-         (let [cause (last (get-in (.-ct cl) [::s/yarns site-id]))
+         (let [cause (peek (get-in (.-ct cl) [::s/yarns site-id]))
                node  (c/new-node (inc (or (ffirst cause) 1)) site-id
                                  (or (first cause) s/root-id) (first phrase))]
                ; (rand-node cl site-id (first phrase))]
@@ -173,6 +173,6 @@ respecting it." #" "))
   (dissoc (rand-weave-of-phrases 3) :cl :insertions)
 
   (def cl (atom (c/new-causal-list)))
-  (time (do (doall (repeatedly 50 #(swap! cl insert-rand-node))) nil))
+  (time (do (doall (repeatedly 200 #(swap! cl insert-rand-node))) nil))
   (quick-bench (do (insert-rand-node @cl) nil))
   (quick-bench (do (c/causal->edn @cl) nil)))

@@ -110,7 +110,7 @@
   ([causal-tree node]
    (let [site-id (second (first node))]
      (if-let [yarn (get-in causal-tree [::yarns site-id])]
-       (if (> (ffirst node) (ffirst (last yarn))) ; compare lamport timestamps
+       (if (> (ffirst node) (ffirst (peek yarn))) ; compare lamport timestamps
          (update-in causal-tree [::yarns site-id] conj node)
          (update-in causal-tree [::yarns site-id] u/insert node)) ; u/insert is expensive. Avoid it.
        (assoc-in causal-tree [::yarns site-id] [node])))))
@@ -151,7 +151,7 @@
   Expects ::yarns cache to be up to date and sorted."
   [causal-tree]
   (->> (::yarns causal-tree)
-       (reduce #(max %1 (ffirst (last (last %2)))) 0)
+       (reduce #(max %1 (ffirst (peek (peek %2)))) 0)
        (assoc causal-tree ::lamport-ts)))
 
 (defn yarns->nodes

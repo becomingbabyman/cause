@@ -44,11 +44,11 @@
 
 (defn get-
   ([causal-tree k]
-   (last (first (get-in causal-tree [::s/weave k])))))
+   (peek (first (get-in causal-tree [::s/weave k])))))
 
 (defn count- [causal-tree]
   (reduce-kv
-   (fn [acc k v] (if (not= (last (first v)) ::s/delete) (inc acc) acc))
+   (fn [acc k v] (if (not= (peek (first v)) ::s/delete) (inc acc) acc))
    0 (::s/weave causal-tree)))
 
 (defn assoc-
@@ -265,7 +265,7 @@
   (first @ct)
   (ffirst @ct)
   (second @ct)
-  (last @ct)
+  (peek @ct)
   (next @ct)
   (rest @ct)
   (map (partial map clojure.string/upper-case) @ct)
