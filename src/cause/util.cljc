@@ -42,7 +42,7 @@
   the sort on insert."
   ([coll val] (if-let [i (sorted-insertion-index coll val {:uniq true})]
                 (insert coll i val) coll))
-  ([coll i val] (into [] cat [(take i coll) [val] (drop i coll)])))
+  ([coll i val] (into (subvec coll 0 i) cat [[val] (subvec coll i)])))
 
 (defmacro redef
   "Moves a symbol to the current ns, preserving the docstring and arglists."
