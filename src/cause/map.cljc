@@ -39,7 +39,7 @@
          (if (or (empty? right)
                  (<< (first nr) id))
            (assoc-in causal-tree [::s/weave k]
-                     (vec (concat left [[id v]] right)))
+                     (into left cat [[[id v]] right]))
            (recur (conj left nr) (rest right))))))))
 
 (defn get-

@@ -67,7 +67,7 @@
              asap (or prev-asap (weave-asap? nl node nr))]
          (if (or (empty? right)
                  (and asap (not (weave-later? nl node nr seen-since-asap))))
-           (assoc causal-tree ::s/weave (vec (concat left [node] right)))
+           (assoc causal-tree ::s/weave (into left cat [[node] right]))
            (recur (conj left nr) (rest right) asap (if asap
                                                      (assoc seen-since-asap
                                                             (first nl) true)
