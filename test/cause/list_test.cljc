@@ -42,56 +42,56 @@
     ; (is (= causal-tree refreshed-ct))))
 
 (deftest known-idempotent-insert-edge-cases
-  (let [nodes [[[1 "xT_odlTBwTRNU"] [0 "0"] ::s/delete]
-               [[2 "9FyYzf9pum6E4"] [1 "xT_odlTBwTRNU"] \d]
-               [[3 "9FyYzf9pum6E4"] [0 "0"] \r]
-               [[4 "NwudSBdQg3Ru2"] [3 "9FyYzf9pum6E4"] \space]
-               [[4 "9FyYzf9pum6E4"] [0 "0"] \d]]
+  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] ::s/delete]
+               [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \d]
+               [[3 "9FyYzf9pum6E4" 0] [0 "0" 0] \r]
+               [[4 "NwudSBdQg3Ru2" 0] [3 "9FyYzf9pum6E4" 0] \space]
+               [[4 "9FyYzf9pum6E4" 0] [0 "0" 0] \d]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "xT_odlTBwTRNU"] [0 "0"] \space]
-               [[2 "xT_odlTBwTRNU"] [0 "0"] \b]
-               [[2 "NwudSBdQg3Ru2"] [1 "xT_odlTBwTRNU"] \q]
-               [[2 "9FyYzf9pum6E4"] [1 "xT_odlTBwTRNU"] \space]]
+  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] \space]
+               [[2 "xT_odlTBwTRNU" 0] [0 "0" 0] \b]
+               [[2 "NwudSBdQg3Ru2" 0] [1 "xT_odlTBwTRNU" 0] \q]
+               [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \space]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "Pz8iuNCXvVsYN"] [0 "0"] \o]
-               [[2 "Pz8iuNCXvVsYN"] [1 "Pz8iuNCXvVsYN"] ::s/delete]
-               [[3 "9FyYzf9pum6E4"] [2 "Pz8iuNCXvVsYN"] \u]
-               [[2 "NwudSBdQg3Ru2"] [1 "Pz8iuNCXvVsYN"] \space]]
+  (let [nodes [[[1 "Pz8iuNCXvVsYN" 0] [0 "0" 0] \o]
+               [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] ::s/delete]
+               [[3 "9FyYzf9pum6E4" 0] [2 "Pz8iuNCXvVsYN" 0] \u]
+               [[2 "NwudSBdQg3Ru2" 0] [1 "Pz8iuNCXvVsYN" 0] \space]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \j]
-               [[1 "VdIJLRISw~zgo"] [0 "0"] \w]
-               [[1 "A~iIXinAXkGX7"] [0 "0"] ::s/delete]]
+  (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \j]
+               [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \w]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::s/delete]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "W7XhooU1Hsw7E"] [0 "0"] \u]
-               [[2 "W7XhooU1Hsw7E"] [1 "W7XhooU1Hsw7E"] \space]
-               [[2 "7hLbMKLvcll_4"] [1 "W7XhooU1Hsw7E"] ::s/delete]
-               [[1 "VdIJLRISw~zgo"] [0 "0"] \m]]
+  (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \u]
+               [[2 "W7XhooU1Hsw7E" 0] [1 "W7XhooU1Hsw7E" 0] \space]
+               [[2 "7hLbMKLvcll_4" 0] [1 "W7XhooU1Hsw7E" 0] ::s/delete]
+               [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \m]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "Ftbpo0oG7ZnpR"] [0 "0"] ::s/delete]
-               [[1 "A~iIXinAXkGX7"] [0 "0"] ::s/delete]]
+  (let [nodes [[[1 "Ftbpo0oG7ZnpR" 0] [0 "0" 0] ::s/delete]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::s/delete]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "VdIJLRISw~zgo"] [0 "0"] ::s/delete]
-               [[2 "A~iIXinAXkGX7"] [1 "VdIJLRISw~zgo"] "j"]
-               [[3 "A~iIXinAXkGX7"] [0 "0"] "i"]
-               [[1 "W7XhooU1Hsw7E"] [0 "0"] "s"]]
+  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] ::s/delete]
+               [[2 "A~iIXinAXkGX7" 0] [1 "VdIJLRISw~zgo" 0] "j"]
+               [[3 "A~iIXinAXkGX7" 0] [0 "0" 0] "i"]
+               [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] "s"]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 " f "] [0 "0"] ::s/delete]
-               [[2 " z "] [1 " f "] " "]
-               [[2 " f "] [0 "0"] "l"]
-               [[2 " a "] [1 " f "] "v"]]
+  (let [nodes [[[1 " f " 0] [0 "0" 0] ::s/delete]
+               [[2 " z " 0] [1 " f " 0] " "]
+               [[2 " f " 0] [0 "0" 0] "l"]
+               [[2 " a " 0] [1 " f " 0] "v"]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 " f "] [0 "0"] ::s/delete]
-               [[2 " f "] [0 "0"] ::s/delete]
-               [[3 " a "] [2 " f "] "c"]
-               [[2 " z "] [1 " f "] "r"]]
+  (let [nodes [[[1 " f " 0] [0 "0" 0] ::s/delete]
+               [[2 " f " 0] [0 "0" 0] ::s/delete]
+               [[3 " a " 0] [2 " f " 0] "c"]
+               [[2 " z " 0] [1 " f " 0] "r"]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl)))
 
@@ -141,7 +141,7 @@ respecting it." #" "))
        (if (not-empty phrase)
          (let [cause (last (get-in (.-ct cl) [::s/yarns site-id]))
                node  (c/new-node (inc (or (ffirst cause) 1)) site-id
-                             (or (first cause) s/root-id) (first phrase))]
+                                 (or (first cause) s/root-id) (first phrase))]
                ; (rand-node cl site-id (first phrase))]
            (recur (c/insert cl node)
                   (conj insertions node)

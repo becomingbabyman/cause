@@ -19,7 +19,7 @@
 
 (def types #{::map ::list}) ; ::rope ::counter
 (def speical-keywords #{::delete})
-(def root-id [0 "0"])
+(def root-id [0 "0" 0]) ; 0])
 (def root-node [root-id nil nil])
 (def uuid-length 21)
 (def site-id-length 13)
@@ -28,7 +28,7 @@
   (gen/fmap #(apply str %) (gen/vector (gen/char-alpha) length)))
 
 (spec/def ::type types)
-(spec/def ::lamport-ts nat-int?) ; AKA the index in a yarn
+(spec/def ::lamport-ts nat-int?) ; the logical insertion order (the index in a yarn)
 ; TODO: should a wall-clock-ts be added? If a central Datomic DB is used then nodes will get a wall clock ts based on when they were synced to the server...
 (spec/def ::uuid (spec/with-gen (spec/and string? #(= (count %) uuid-length))
                                 #(gen-string uuid-length)))
@@ -36,7 +36,9 @@
                                                        (= (count %) site-id-length)
                                                        (= % "0")))
                                    #(gen-string site-id-length)))
-(spec/def ::id (spec/tuple ::lamport-ts ::site-id))
+(spec/def ::tx-index nat-int?) ; the index in a transaction (every ::lamport-ts is a transaction of one or more insertions)
+; (spec/def ::global-lamport-ts ::lamport-ts) ; optionally shared across multiple causal collections
+(spec/def ::id (spec/tuple ::lamport-ts ::site-id ::tx-index)) ; ::global-lamport-ts))
 (spec/def ::key (spec/or :k keyword?
                          :s string?))
 (spec/def ::cause (spec/or :previous-list-item ::id
@@ -75,12 +77,19 @@
   ([[k v]] ; maps the keys / values in the ::nodes map back to nodes
    (into [k] v))
   ([lamport-ts site-id cause value]
-   [[lamport-ts site-id] cause value]))
+   (new-node lamport-ts site-id 0 cause value))
+  ([lamport-ts site-id tx-index cause value]
+   [[lamport-ts site-id tx-index] cause value]))
 (spec/fdef new-node
            :args (spec/or
                   :arity-1 (spec/cat :node-kv-tuple (spec/tuple ::id (spec/tuple ::cause ::value)))
+                  :arity-4 (spec/cat :lamport-ts ::lamport-ts
+                                     :site-id ::site-id
+                                     :cause ::cause
+                                     :value ::value)
                   :arity-5 (spec/cat :lamport-ts ::lamport-ts
                                      :site-id ::site-id
+                                     :tx-index ::tx-index
                                      :cause ::cause
                                      :value ::value))
            :ret ::node
@@ -113,7 +122,7 @@
   [weave-fn causal-tree node]
   (if-let [existing-node-body (get-in causal-tree [::nodes (first node)])]
     (if (= (rest node) existing-node-body)
-      causal-tree
+      causal-tree ; idempotency!
       (throw (ex-info "This node is already in the tree and can't be changed."
                       {:causes #{:append-only :edits-not-allowed}
                        :existing-node (cons (first node) existing-node-body)})))
