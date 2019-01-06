@@ -21,8 +21,8 @@
 (def speical-keywords #{::delete})
 (def root-id [0 "0" 0]) ; 0])
 (def root-node [root-id nil nil])
-(def uuid-length 21)
-(def site-id-length 13)
+(def ^:const uuid-length 21)
+(def ^:const site-id-length 13)
 
 (defn gen-string [length]
   (gen/fmap #(apply str %) (gen/vector (gen/char-alpha) length)))
