@@ -12,8 +12,8 @@
 (defn new-causal-tree []
   {::s/type ::s/map
    ::s/lamport-ts 0
-   ::s/uuid (u/uid)
-   ::s/site-id (s/site-id)
+   ::s/uuid (u/new-uid)
+   ::s/site-id (s/new-site-id)
    ::s/nodes {}
    ::s/yarns {}
    ::s/weave {}})
@@ -248,9 +248,9 @@
   (empty @ct)
   (do
     (def ct2 (atom @ct))
-    (swap! ct2 proto/insert (s/new-node 6 (s/site-id) :foo "boo"))
-    (swap! ct2 proto/insert (s/new-node 3 (s/site-id) :flip "grip"))
-    (swap! ct2 proto/insert (s/new-node 23 (s/site-id) :stew "art"))
+    (swap! ct2 proto/insert (s/new-node 6 (s/new-site-id) :foo "boo"))
+    (swap! ct2 proto/insert (s/new-node 3 (s/new-site-id) :flip "grip"))
+    (swap! ct2 proto/insert (s/new-node 23 (s/new-site-id) :stew "art"))
     (swap! ct assoc :flim "flam")
     (proto/causal-merge @ct @ct2))
   (swap! ct assoc :ct2 ct2)

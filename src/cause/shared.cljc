@@ -70,7 +70,7 @@
 (spec/def ::causal-tree (spec/keys :req [::nodes ::lamport-ts ::uuid ::site-id]
                                    :opt [::yarns ::weave]))
 
-(defn site-id [] (u/uid site-id-length))
+(defn new-site-id [] (u/new-uid site-id-length))
 
 (defn new-node
   "Helper function to create a node for insertion into a causal collection."

@@ -12,8 +12,8 @@
 (defn new-causal-tree []
   {::s/type ::s/list
    ::s/lamport-ts 0
-   ::s/uuid (u/uid)
-   ::s/site-id (s/site-id)
+   ::s/uuid (u/new-uid)
+   ::s/site-id (s/new-site-id)
    ::s/nodes {(first s/root-node) (rest s/root-node)}
    ::s/yarns {(second (first s/root-node)) [s/root-node]}
    ::s/weave [s/root-node]})

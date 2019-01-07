@@ -11,7 +11,7 @@
   (concat [c/hide c/hide c/hide c/show c/show \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
 ; (def site-ids [0 1 2])
-(def site-ids [(s/site-id) (s/site-id) (s/site-id) (s/site-id) (s/site-id)])
+(def site-ids [(s/new-site-id) (s/new-site-id) (s/new-site-id) (s/new-site-id) (s/new-site-id)])
 
 (defn rand-node
   ([causal-list] (rand-node causal-list (rand-nth site-ids)))
@@ -138,7 +138,7 @@ respecting it." #" "))
             insertions []
             phrase (first starting-phrases)
             phrases (rest starting-phrases)
-            site-id (s/site-id)]
+            site-id (s/new-site-id)]
        (if (not-empty phrase)
          (let [cause (peek (get-in (.-ct cl) [::s/yarns site-id]))
                node  (c/new-node (inc (or (ffirst cause) 1)) site-id
@@ -148,7 +148,7 @@ respecting it." #" "))
                   (conj insertions node)
                   (if (not-empty (rest phrase)) (rest phrase) (first phrases))
                   (if (not-empty (rest phrase)) phrases (rest phrases))
-                  (if (not-empty (rest phrase)) site-id (s/site-id))))
+                  (if (not-empty (rest phrase)) site-id (s/new-site-id))))
          {:cl cl
           :insertions insertions
           :phrases starting-phrases
