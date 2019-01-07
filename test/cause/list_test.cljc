@@ -1,13 +1,14 @@
 (ns cause.list-test
   (:require [cause.shared :as s]
             [cause.core :as c]
+            [cause.protocols :as proto]
             [cause.list :as c-list]
             [clojure.string :as string]
             [clojure.test :refer [deftest is]]
             #? (:clj [criterium.core :refer [quick-bench]])))
 
 (def simple-values
-  (concat [c/delete c/delete c/delete \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
+  (concat [c/hide c/hide c/hide c/show c/show \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
 ; (def site-ids [0 1 2])
 (def site-ids [(s/site-id) (s/site-id) (s/site-id) (s/site-id) (s/site-id)])
@@ -42,7 +43,7 @@
     ; (is (= causal-tree refreshed-ct))))
 
 (deftest known-idempotent-insert-edge-cases
-  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] ::s/delete]
+  (let [nodes [[[1 "xT_odlTBwTRNU" 0] [0 "0" 0] c/hide]
                [[2 "9FyYzf9pum6E4" 0] [1 "xT_odlTBwTRNU" 0] \d]
                [[3 "9FyYzf9pum6E4" 0] [0 "0" 0] \r]
                [[4 "NwudSBdQg3Ru2" 0] [3 "9FyYzf9pum6E4" 0] \space]
@@ -56,40 +57,40 @@
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "Pz8iuNCXvVsYN" 0] [0 "0" 0] \o]
-               [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] ::s/delete]
+               [[2 "Pz8iuNCXvVsYN" 0] [1 "Pz8iuNCXvVsYN" 0] c/hide]
                [[3 "9FyYzf9pum6E4" 0] [2 "Pz8iuNCXvVsYN" 0] \u]
                [[2 "NwudSBdQg3Ru2" 0] [1 "Pz8iuNCXvVsYN" 0] \space]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \j]
                [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \w]
-               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::s/delete]]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] c/hide]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
   (let [nodes [[[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] \u]
                [[2 "W7XhooU1Hsw7E" 0] [1 "W7XhooU1Hsw7E" 0] \space]
-               [[2 "7hLbMKLvcll_4" 0] [1 "W7XhooU1Hsw7E" 0] ::s/delete]
+               [[2 "7hLbMKLvcll_4" 0] [1 "W7XhooU1Hsw7E" 0] c/hide]
                [[1 "VdIJLRISw~zgo" 0] [0 "0" 0] \m]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "Ftbpo0oG7ZnpR" 0] [0 "0" 0] ::s/delete]
-               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] ::s/delete]]
+  (let [nodes [[[1 "Ftbpo0oG7ZnpR" 0] [0 "0" 0] c/hide]
+               [[1 "A~iIXinAXkGX7" 0] [0 "0" 0] c/hide]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] ::s/delete]
+  (let [nodes [[[1 "VdIJLRISw~zgo" 0] [0 "0" 0] c/hide]
                [[2 "A~iIXinAXkGX7" 0] [1 "VdIJLRISw~zgo" 0] "j"]
                [[3 "A~iIXinAXkGX7" 0] [0 "0" 0] "i"]
                [[1 "W7XhooU1Hsw7E" 0] [0 "0" 0] "s"]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 " f " 0] [0 "0" 0] ::s/delete]
+  (let [nodes [[[1 " f " 0] [0 "0" 0] c/hide]
                [[2 " z " 0] [1 " f " 0] " "]
                [[2 " f " 0] [0 "0" 0] "l"]
                [[2 " a " 0] [1 " f " 0] "v"]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
     (idempotent? cl))
-  (let [nodes [[[1 " f " 0] [0 "0" 0] ::s/delete]
-               [[2 " f " 0] [0 "0" 0] ::s/delete]
+  (let [nodes [[[1 " f " 0] [0 "0" 0] c/hide]
+               [[2 " f " 0] [0 "0" 0] c/hide]
                [[3 " a " 0] [2 " f " 0] "c"]
                [[2 " z " 0] [1 " f " 0] "r"]]
         cl (reduce c/insert (c/new-causal-list) nodes)]
@@ -159,11 +160,25 @@ respecting it." #" "))
     (doall (map #(is (string/includes? (:materialized-weave result) %))
                 (:phrases result)))))
 
+(deftest hide-and-show-and-hide-and-show
+  (let [cl (atom (c/new-causal-list "a" "b" "c"))
+        a-node (second (proto/get-weave @cl))]
+    (is (= '("a" "b" "c") (c/causal->edn @cl)))
+    (swap! cl proto/append (first a-node) c/hide)
+    (is (= '("b" "c") (c/causal->edn @cl)))
+    (swap! cl proto/append (first a-node) c/show)
+    (is (= '("a" "b" "c") (c/causal->edn @cl)))
+    (swap! cl proto/append (first a-node) c/hide)
+    (is (= '("b" "c") (c/causal->edn @cl)))
+    (swap! cl proto/append (first a-node) c/show)
+    (is (= '("a" "b" "c") (c/causal->edn @cl)))))
+
 (comment
   (do
     (known-idempotent-insert-edge-cases)
     (try-to-find-new-idempotent-edge-cases)
-    (concurrent-runs-stick-together))
+    (concurrent-runs-stick-together)
+    (hide-and-show-and-hide-and-show))
 
   (time
    (keep (fn [_] (find-weave-inconsistencies 9))
@@ -175,4 +190,10 @@ respecting it." #" "))
   (def cl (atom (c/new-causal-list)))
   (time (do (doall (repeatedly 200 #(swap! cl insert-rand-node))) nil))
   (quick-bench (do (insert-rand-node @cl) nil))
-  (quick-bench (do (c/causal->edn @cl) nil)))
+  (quick-bench (do (c/causal->edn @cl) nil))
+
+  (def cl2 (atom (c/new-causal-list)))
+  (time (do (doall (repeatedly 5 #(swap! cl2 insert-rand-node))) nil))
+  (swap! cl2 proto/append (first (second (proto/get-weave @cl2))) c/hide)
+  (swap! cl2 proto/append (first (second (proto/get-weave @cl2))) c/show)
+  (c/causal->edn @cl2))

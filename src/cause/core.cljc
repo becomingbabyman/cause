@@ -8,7 +8,9 @@
 ; Nodes are the building blocks of causal data types.
 (redef new-node s/new-node)
 
-(def ^{:doc "Insert this value to delete a cause."} delete ::s/delete)
+(def ^{:doc "Insert this value to hide a cause."} hide ::s/hide)
+(def ^{:doc "An alias for hide."} delete ::s/hide)
+(def ^{:doc "If a cause is hidden, insert this value to show it again."} show ::s/show)
 
 ; Causal collection types. These are convergent and EDN-like.
 (redef new-causal-list c-list/new-causal-list)
@@ -29,8 +31,3 @@
 
 ; (defn undo [causal-tree & site-id] (println "TODO"))
 ; (defn redo [causal-tree & site-id] (println "TODO"))
-
-; TODO: how should batch insert and delete be handled?
-;   E.g. delete selection or paste in content.
-;   Ideally that would be one insertion so it would have
-;   consitent ordering (one ts) and so it could be one undo.

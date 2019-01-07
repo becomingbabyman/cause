@@ -48,7 +48,8 @@
 
 (defn count- [causal-tree]
   (reduce-kv
-   (fn [acc k v] (if (not= (peek (first v)) ::s/delete) (inc acc) acc))
+   (fn [acc k v] (if (s/special-keywords (peek (first v)))
+                   acc (inc acc)))
    0 (::s/weave causal-tree)))
 
 (defn assoc-
@@ -61,8 +62,8 @@
 
 (defn dissoc-
   ([causal-tree k]
-   (if (get- causal-tree k) ; only delete keys that are already in the tree
-     (s/append weave causal-tree k ::s/delete)
+   (if (get- causal-tree k) ; only hide keys that are already in the tree
+     (s/append weave causal-tree k ::s/hide)
      causal-tree))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- causal-tree k) ks)))
@@ -75,10 +76,17 @@
   will materialize as a map. This is mostly for testing and pretty
   printing. In most cases it's prefferable to work with the whole tree."
   ([causal-tree opts]
-   (reduce (fn [acc [k [[_ v]]]]
-             (if (= v ::s/delete)
-               acc
-               (assoc acc k (s/causal->edn v opts))))
+   (reduce (fn [acc [k [[_ v] & more]]]
+             (cond
+               (= v ::s/hide) acc
+               (= v ::s/show) (assoc acc k
+                                     (s/causal->edn
+                                      (loop [[[_ next-v] & next-more] more]
+                                        (if (s/special-keywords next-v)
+                                          (recur next-more)
+                                          next-v))
+                                      opts))
+               :else (assoc acc k (s/causal->edn v opts))))
            {} (::s/weave causal-tree))))
 
 #? (:clj

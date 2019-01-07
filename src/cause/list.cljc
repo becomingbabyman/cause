@@ -33,21 +33,21 @@
   [nl nm nr seen]
   (or
    (and
-    (= ::s/delete (peek nr)) ; if the next node is a delete
-    (not= (first nm) (second nr)) ; and it does not delete this node, don't weave
-    (or (not= ::s/delete (peek nm)) ; and this node is not also a delete
-        (<< (first nm) (first nr)))) ; or if it is, it is older, don't weave.
+    (s/special-keywords (peek nr)) ; if the next node is a hide or a show
+    (not= (first nm) (second nr)) ; and it does not hide or show this node
+    (or (not (s/special-keywords (peek nm))) ; and this node is not also a hide or a show
+        (<< (first nm) (first nr)))) ; or if it is, but it is older, don't weave.
    (and
     (or (= (first nl) (second nr)) ; if the next node is caused by the previous node
         (= (second nl) (second nr)) ; or if the next node shares a cause with the previous node
         (get seen (second nr))) ; or the next node is caused by a seen node
     (<< (first nm) (first nr)) ; and this node is older
-    (or (not= ::s/delete (peek nm)) ; and this node is not a delete
-        (= ::s/delete (peek nr)))) ; or the next node is a delete, don't weave.
+    (or (not (s/special-keywords (peek nm))) ; and this node is not a hide or a show
+        (s/special-keywords (peek nr)))) ; or the next node is a hide or a show, don't weave.
    (and
-    (<< (first nm) (first nr)) ; and this node is older
-    (or (not= ::s/delete (peek nm)) ; and this node is not a delete
-        (= ::s/delete (peek nr)))))) ; or the next node is a delete, don't weave.
+    (<< (first nm) (first nr)) ; if this node is older than the next
+    (or (not (s/special-keywords (peek nm))) ; and this node is not a hide or a show
+        (s/special-keywords (peek nr)))))) ; or the next node is a hide or a show, don't weave.
 
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
@@ -85,11 +85,11 @@
 (defn empty- [causal-tree]
   (conj (new-causal-tree) (select-keys causal-tree [::s/site-id ::s/uuid])))
 
-(defn deleted?
-  "Has a node been deleted or is it a delete?"
+(defn hide?
+  "Is this node hidden when the weave is rendered"
   [node next-node-in-weave]
-  (or (= ::s/delete (peek node))
-      (and (= ::s/delete (peek next-node-in-weave))
+  (or (s/special-keywords (peek node))
+      (and (= ::s/hide (peek next-node-in-weave))
            (= (first node) (second next-node-in-weave)))))
 
 (defn causal-list->edn
@@ -101,7 +101,7 @@
         (partition 2 1 [nil])
         (keep (partial causal-list->edn causal-tree opts))))
   ([causal-tree opts [n nr]]
-   (if (deleted? n nr) nil
+   (if (hide? n nr) nil
        (s/causal->edn (peek n) opts))))
 
 #? (:clj
@@ -206,7 +206,7 @@
     (def ct (atom (new-causal-list "f" "o" "o")))
     (swap! ct conj " ")
     (swap! ct conj "b" "a" "r")
-    (swap! ct proto/append (first (second (proto/get-weave @ct))) ::s/delete)
+    (swap! ct proto/append (first (second (proto/get-weave @ct))) ::s/hide)
     (swap! ct proto/append (first (second (proto/get-weave @ct))) "g"))
   (count @ct)
   (hash @ct)
