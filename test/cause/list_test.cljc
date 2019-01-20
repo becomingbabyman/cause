@@ -1,7 +1,6 @@
 (ns cause.list-test
   (:require [cause.shared :as s]
             [cause.core :as c]
-            [cause.protocols :as proto]
             [cause.list :as c-list]
             [clojure.string :as string]
             [clojure.test :refer [deftest is]]
@@ -162,23 +161,53 @@ respecting it." #" "))
 
 (deftest hide-and-show-and-hide-and-show
   (let [cl (atom (c/new-causal-list "a" "b" "c"))
-        a-node (second (proto/get-weave @cl))]
+        a-node (second (c/get-weave @cl))]
     (is (= '("a" "b" "c") (c/causal->edn @cl)))
-    (swap! cl proto/append (first a-node) c/hide)
+    (swap! cl c/append (first a-node) c/hide)
     (is (= '("b" "c") (c/causal->edn @cl)))
-    (swap! cl proto/append (first a-node) c/show)
+    (swap! cl c/append (first a-node) c/show)
     (is (= '("a" "b" "c") (c/causal->edn @cl)))
-    (swap! cl proto/append (first a-node) c/hide)
+    (swap! cl c/append (first a-node) c/hide)
     (is (= '("b" "c") (c/causal->edn @cl)))
-    (swap! cl proto/append (first a-node) c/show)
+    (swap! cl c/append (first a-node) c/show)
     (is (= '("a" "b" "c") (c/causal->edn @cl)))))
+
+(deftest core-cljc-list-protocol-test
+  ; empty? conj count seq first
+  ; last next rest map seq hash
+  ; TODO: str get get-in nth mapv reduce reduce-kv update update-in cons
+  (is (empty? (c/new-causal-list)))
+  (is (not (empty? (c/new-causal-list :foo "bar"))))
+  (is (empty? (-> (c/new-causal-list :foo) (conj c/hide))))
+  (let [ct (c/new-causal-list :foo)
+        n (first ct)]
+    (is (not (empty? (-> (c/append ct (first n) c/hide)
+                         (c/append (first n) c/show))))))
+  (is (= 0 (count (c/new-causal-list))))
+  (is (= 1 (count (c/new-causal-list :foo))))
+  (is (= 0 (count (-> (c/new-causal-list :foo) (conj c/hide)))))
+  (let [ct (c/new-causal-list :foo)
+        n (first ct)]
+    (is (= 1 (count (-> (c/append ct (first n) c/hide)
+                        (c/append (first n) c/show))))))
+  (let [node [[1 "site-id" 0] s/root-id :foo]]
+    (is (= (list node) (seq (-> (c/new-causal-list) (c/insert node)))))
+    (is (= node (first (-> (c/new-causal-list) (c/insert node)))))
+    (is (= node (last (-> (c/new-causal-list) (c/insert node)))))
+    (is (= nil (next (-> (c/new-causal-list) (c/insert node)))))
+    (is (= (list node) (next (-> (c/new-causal-list) (c/insert node) (c/append s/root-id "bar")))))
+    (is (= '() (rest (-> (c/new-causal-list) (c/insert node)))))
+    (is (= (list node) (rest (-> (c/new-causal-list) (c/insert node) (c/append s/root-id "bar")))))
+    (is (= (list node) (map #(do %) (-> (c/new-causal-list) (c/insert node))))))
+  (is (int? (hash (c/new-causal-list :foo)))))
 
 (comment
   (do
     (known-idempotent-insert-edge-cases)
     (try-to-find-new-idempotent-edge-cases)
     (concurrent-runs-stick-together)
-    (hide-and-show-and-hide-and-show))
+    (hide-and-show-and-hide-and-show)
+    (core-cljc-list-protocol-test))
 
   (time
    (keep (fn [_] (find-weave-inconsistencies 9))
@@ -194,6 +223,6 @@ respecting it." #" "))
 
   (def cl2 (atom (c/new-causal-list)))
   (time (do (doall (repeatedly 5 #(swap! cl2 insert-rand-node))) nil))
-  (swap! cl2 proto/append (first (second (proto/get-weave @cl2))) c/hide)
-  (swap! cl2 proto/append (first (second (proto/get-weave @cl2))) c/show)
+  (swap! cl2 c/append (first (second (c/get-weave @cl2))) c/hide)
+  (swap! cl2 c/append (first (second (c/get-weave @cl2))) c/show)
   (c/causal->edn @cl2))

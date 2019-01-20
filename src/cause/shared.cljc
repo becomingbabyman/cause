@@ -48,7 +48,8 @@
                            :s string?
                            :k keyword?
                            :n number?
-                           :ct ::causal-tree))
+                           :ct ::causal-tree
+                           :other any?))
 
 ; AKA an atom in CT parlance.
 (spec/def ::node (spec/cat :id ::id

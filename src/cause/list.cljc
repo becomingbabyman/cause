@@ -90,19 +90,25 @@
   [node next-node-in-weave]
   (or (s/special-keywords (peek node))
       (and (= ::s/hide (peek next-node-in-weave))
-           (= (first node) (second next-node-in-weave)))))
+           (= (first node) (second next-node-in-weave)))
+      (= s/root-node node)))
 
 (defn causal-list->edn
   "Returns the current state of the tree as edn. E.g. a tree of chars
   will materialize as a string. This is mostly for testing and pretty
   printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree opts]
-   (->> (::s/weave causal-tree)
-        (partition 2 1 [nil])
-        (keep (partial causal-list->edn causal-tree opts))))
-  ([causal-tree opts [n nr]]
-   (if (hide? n nr) nil
-       (s/causal->edn (peek n) opts))))
+  [causal-tree opts]
+  (->> (::s/weave causal-tree)
+       (partition 2 1 [nil])
+       (keep (fn [[n nr]]
+               (if (hide? n nr) nil
+                   (s/causal->edn (peek n) opts))))))
+
+(defn causal-list->list [causal-tree]
+  (->> (::s/weave causal-tree)
+       (partition 2 1 [nil])
+       (keep (fn [[n nr]]
+               (if (hide? n nr) nil n)))))
 
 #? (:clj
     (deftype CausalList [ct]
@@ -119,13 +125,13 @@
           ;   to the same value? Or should all the nodes have to match?
       (equals [this o] (.equals (.ct this) o))
       (hashCode [this] (.hashCode (.ct this)))
-      (toString [this] (.toString (s/causal->edn this)))
+      (toString [this] (.toString (causal-list->list (.ct this))))
 
       IHashEq
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
 
       Seqable
-      (seq [this] (.seq ^Seqable (s/causal->edn this {:deref-atoms false})))
+      (seq [this] (.seq ^Seqable (causal-list->list (.ct this))))
 
       IObj
       (withMeta [this meta] (CausalList. (with-meta ^IObj (.ct this) meta)))
@@ -155,10 +161,10 @@
       (-hash [this] (-hash (.-ct this)))
 
       ISeqable
-      (-seq [this] (-seq (s/causal->edn this {:deref-atoms false})))
+      (-seq [this] (-seq (causal-list->list (.-ct this))))
 
       Object
-      (toString [this] (.toString (s/causal->edn this)))
+      (toString [this] (.toString (causal-list->list (.-ct this))))
 
       IMeta
       (-meta [this] (-meta (.-ct this)))
@@ -206,8 +212,9 @@
     (def ct (atom (new-causal-list "f" "o" "o")))
     (swap! ct conj " ")
     (swap! ct conj "b" "a" "r")
-    (swap! ct proto/append (first (second (proto/get-weave @ct))) ::s/hide)
-    (swap! ct proto/append (first (second (proto/get-weave @ct))) "g"))
+    (swap! ct proto/append (first (second @ct)) ::s/hide)
+    (swap! ct proto/append (ffirst @ct) "g"))
+  (seq @ct)
   (count @ct)
   (hash @ct)
   (str @ct)
@@ -228,12 +235,14 @@
   (first @ct)
   (ffirst @ct)
   (second @ct)
+  (last @ct)
   (peek @ct)
   (next @ct)
   (rest @ct)
-  (map clojure.string/upper-case @ct)
+  (map (comp clojure.string/upper-case last) (rest @ct))
   (reduce conj [] @ct)
   (into [] @ct)
+  (vec @ct)
   (empty? @ct)
   (empty? (new-causal-list))
   (+ 1 1))

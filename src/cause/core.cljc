@@ -1,4 +1,6 @@
-(ns cause.core
+(ns ^{:doc "The core Cause API."
+      :author "Chris Smothers"}
+ cause.core
   (:require [cause.shared :as s]
             [cause.util :refer [redef] :refer-macros [redef]]
             [cause.protocols :as proto]
@@ -8,15 +10,22 @@
 ; Nodes are the building blocks of causal data types.
 (redef new-node s/new-node)
 
+; Special values have special effects on causal collections.
 (def ^{:doc "Insert this value to hide a cause."} hide ::s/hide)
 (def ^{:doc "An alias for hide."} delete ::s/hide)
-(def ^{:doc "If a cause is hidden, insert this value to show it again."} show ::s/show)
+(def ^{:doc "If a cause is hidden, insert this value to show
+            it again."} show ::s/show)
 
-; Causal collection types. These are convergent and EDN-like.
+; Special nodes
+(def ^{:doc "The first node in every causal-list. To insert
+             a node at the front set root-node as the cause."}
+  root-node s/root-node)
+
+; Causal collection types are convergent and EDN-like.
 (redef new-causal-list c-list/new-causal-list)
 (redef new-causal-map c-map/new-causal-map)
 
-; Causal specific functions for causal collections.
+; Causal specific functions for causal collections
 (redef insert proto/insert)
 (redef append proto/append)
 (redef weft proto/weft)
