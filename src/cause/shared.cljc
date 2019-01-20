@@ -19,7 +19,7 @@
 
 (def types #{::map ::list}) ; ::rope ::counter
 (def special-keywords #{::hide ::show})
-(def root-id [0 "0" 0]) ; 0])
+(def root-id [0 "0" 0])
 (def root-node [root-id nil nil])
 (def ^:const uuid-length 21)
 (def ^:const site-id-length 13)
@@ -37,8 +37,7 @@
                                                        (= % "0")))
                                    #(gen-string site-id-length)))
 (spec/def ::tx-index nat-int?) ; the index in a transaction (every ::lamport-ts is a transaction of one or more insertions)
-; (spec/def ::global-lamport-ts ::lamport-ts) ; optionally shared across multiple causal collections
-(spec/def ::id (spec/tuple ::lamport-ts ::site-id ::tx-index)) ; ::global-lamport-ts))
+(spec/def ::id (spec/tuple ::lamport-ts ::site-id ::tx-index))
 (spec/def ::key (spec/or :k keyword?
                          :s string?))
 (spec/def ::cause (spec/or :previous-list-item ::id
