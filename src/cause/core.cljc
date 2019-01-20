@@ -1,4 +1,6 @@
-(ns cause.core
+(ns ^{:doc "The core Cause API."
+      :author "Chris Smothers"}
+ cause.core
   (:require [cause.shared :as s]
             [cause.util :refer [redef] :refer-macros [redef]]
             [cause.protocols :as proto]
@@ -6,15 +8,26 @@
             [cause.map :as c-map]))
 
 ; Nodes are the building blocks of causal data types.
-(redef node s/node)
+(redef new-node s/new-node)
 
-(def ^{:doc "Insert this value to delete a cause."} delete ::s/delete)
+; Special values have special effects on causal collections.
+; NOTE: Special values do not compose with one another.
+;       E.g. applying hide to a hide will not equal show.
+(def ^{:doc "Insert this value to hide a cause."} hide ::s/hide)
+(def ^{:doc "An alias for hide."} delete ::s/hide)
+(def ^{:doc "If a cause is hidden, insert this value to show
+            it again."} show ::s/show)
 
-; Causal collection types. These are convergent and EDN-like.
-(redef causal-list c-list/new-causal-list)
-(redef causal-map c-map/new-causal-map)
+; Special nodes
+(def ^{:doc "The first node in every causal-list. To insert
+             a node at the front set root-node as the cause."}
+  root-node s/root-node)
 
-; Causal specific functions for causal collections.
+; Causal collection types are convergent and EDN-like.
+(redef new-causal-list c-list/new-causal-list)
+(redef new-causal-map c-map/new-causal-map)
+
+; Causal specific functions for causal collections
 (redef insert proto/insert)
 (redef append proto/append)
 (redef weft proto/weft)
@@ -29,8 +42,3 @@
 
 ; (defn undo [causal-tree & site-id] (println "TODO"))
 ; (defn redo [causal-tree & site-id] (println "TODO"))
-
-; TODO: how should batch insert and delete be handled?
-;   E.g. delete selection or paste in content.
-;   Ideally that would be one insertion so it would have
-;   consitent ordering (one ts) and so it could be one undo.

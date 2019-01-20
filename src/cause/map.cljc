@@ -12,8 +12,8 @@
 (defn new-causal-tree []
   {::s/type ::s/map
    ::s/lamport-ts 0
-   ::s/uuid (u/uid)
-   ::s/site-id (s/site-id)
+   ::s/uuid (u/new-uid)
+   ::s/site-id (s/new-site-id)
    ::s/nodes {}
    ::s/yarns {}
    ::s/weave {}})
@@ -29,7 +29,7 @@
   infrequently changed."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave {})
-           (map s/node (sort (::s/nodes causal-tree)))))
+           (map s/new-node (sort (::s/nodes causal-tree)))))
   ([causal-tree [id k v :as node]]
    (if (not (get-in causal-tree [::s/nodes id]))
      causal-tree
@@ -39,18 +39,31 @@
          (if (or (empty? right)
                  (<< (first nr) id))
            (assoc-in causal-tree [::s/weave k]
-                     (vec (concat left [[id v]] right)))
+                     (into left cat [[[id v]] right]))
            (recur (conj left nr) (rest right))))))))
 
-; Specialty helper functions
+(defn active-node
+  "Returns the active node for a given tuple of
+  [cause [[id value] [id value] ...]] i.e. a row in a weave.
+  Returns ::blank when the value is hidden."
+  [key-values-from-weave]
+  (let [[c [[id v] & more]] key-values-from-weave]
+    (cond
+      (= v ::s/hide) ::blank
+      (= v ::s/show) (loop [[[next-id next-v] & next-more] more]
+                       (if (s/special-keywords next-v)
+                         (recur next-more)
+                         [next-id c next-v]))
+      :else [id c v])))
 
 (defn get-
   ([causal-tree k]
-   (last (first (get-in causal-tree [::s/weave k])))))
+   (peek (first (get-in causal-tree [::s/weave k])))))
 
 (defn count- [causal-tree]
   (reduce-kv
-   (fn [acc k v] (if (not= (last (first v)) ::s/delete) (inc acc) acc))
+   (fn [acc k v] (if (= ::s/hide (peek (first v)))
+                   acc (inc acc)))
    0 (::s/weave causal-tree)))
 
 (defn assoc-
@@ -63,8 +76,8 @@
 
 (defn dissoc-
   ([causal-tree k]
-   (if (get- causal-tree k) ; only delete keys that are already in the tree
-     (s/append weave causal-tree k ::s/delete)
+   (if (get- causal-tree k) ; only hide keys that are already in the tree
+     (s/append weave causal-tree k ::s/hide)
      causal-tree))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- causal-tree k) ks)))
@@ -76,12 +89,18 @@
   "Returns the current state of the tree as edn. E.g. a tree of ks & vs
   will materialize as a map. This is mostly for testing and pretty
   printing. In most cases it's prefferable to work with the whole tree."
-  ([causal-tree opts]
-   (reduce (fn [acc [k [[_ v]]]]
-             (if (= v ::s/delete)
-               acc
-               (assoc acc k (s/causal->edn v opts))))
-           {} (::s/weave causal-tree))))
+  [causal-tree opts]
+  (reduce (fn [acc kvs]
+            (let [node (active-node kvs)]
+              (if (= node ::blank) acc
+                  (assoc acc (second node) (s/causal->edn (last node) opts)))))
+          {} (::s/weave causal-tree)))
+
+(defn causal-map->list [causal-tree]
+  (reduce (fn [acc kvs]
+            (let [node (active-node kvs)]
+              (if (= node ::blank) acc (conj acc node))))
+          '() (::s/weave causal-tree)))
 
 #? (:clj
     (deftype CausalMap [ct]
@@ -120,7 +139,10 @@
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
 
       Seqable
-      (seq [this] (.seq ^Seqable (s/causal->edn this {:deref-atoms false})))
+      (seq [this] (.seq ^Seqable (causal-map->list (.ct this))))
+
+      ; java.lang.Iterable ; NOTE: reduce (good) reduce-kv (bad) fix and add to CLJS before commenting in.
+      ; (iterator [this] (clojure.lang.SeqIterator. (seq this)))
 
       IFn
       (invoke [this k] (.invoke ^IFn (.ct this) k))
@@ -175,7 +197,7 @@
       (-invoke [this o not-found] ((.-ct this) o not-found))
 
       ISeqable
-      (-seq [this] (-seq (s/causal->edn this {:deref-atoms false})))
+      (-seq [this] (-seq (causal-map->list (.-ct this))))
 
       Object
       (toString [this] (.toString (s/causal->edn this)))
@@ -229,7 +251,9 @@
     (swap! ct assoc :fizz "bang")
     (swap! ct dissoc :foo)
     (swap! ct assoc :foo "bop")
-    (swap! ct assoc :flip "flop"))
+    (swap! ct assoc :flip "flop")
+    (swap! ct dissoc :flip))
+  (seq @ct)
   (s/causal->edn @ct)
   (proto/get-uuid @ct)
   (proto/append @ct :wat "sup")
@@ -242,9 +266,9 @@
   (empty @ct)
   (do
     (def ct2 (atom @ct))
-    (swap! ct2 proto/insert (s/node 6 (s/site-id) :foo "boo"))
-    (swap! ct2 proto/insert (s/node 3 (s/site-id) :flip "grip"))
-    (swap! ct2 proto/insert (s/node 23 (s/site-id) :stew "art"))
+    (swap! ct2 proto/insert (s/new-node 6 (s/new-site-id) :foo "boo"))
+    (swap! ct2 proto/insert (s/new-node 3 (s/new-site-id) :flip "grip"))
+    (swap! ct2 proto/insert (s/new-node 23 (s/new-site-id) :stew "art"))
     (swap! ct assoc :flim "flam")
     (proto/causal-merge @ct @ct2))
   (swap! ct assoc :ct2 ct2)
@@ -267,12 +291,14 @@
   (first @ct)
   (ffirst @ct)
   (second @ct)
-  (last @ct)
+  (peek @ct)
   (next @ct)
   (rest @ct)
   (map (partial map clojure.string/upper-case) @ct)
-  (reduce-kv conj [] @ct)
+  (reduce (fn [& a] a) {} (seq @ct))
+  (reduce-kv (fn [& a] a) {} @ct)
   (empty? @ct)
+  (swap! ct dissoc :yo)
   (swap! ct dissoc :foo)
   (swap! ct dissoc :fizz)
   (swap! ct dissoc :flip)

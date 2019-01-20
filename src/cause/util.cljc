@@ -9,7 +9,7 @@
   ([a b & more]
    (and (<< a b) (apply << b more))))
 
-(defn uid
+(defn new-uid
   "Returns a globally unique ID, encoded to take up as little
   space as possible. See this site for help picking a reasonable
   length https://zelark.github.io/nano-id-cc/. The default for
@@ -42,7 +42,7 @@
   the sort on insert."
   ([coll val] (if-let [i (sorted-insertion-index coll val {:uniq true})]
                 (insert coll i val) coll))
-  ([coll i val] (vec (concat (take i coll) [val] (drop i coll)))))
+  ([coll i val] (into (subvec coll 0 i) cat [[val] (subvec coll i)])))
 
 (defmacro redef
   "Moves a symbol to the current ns, preserving the docstring and arglists."

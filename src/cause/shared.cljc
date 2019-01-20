@@ -18,17 +18,17 @@
 ; Follow up paper (more detailed impl): https://www.dropbox.com/spec/6go311vjfqhgd6f/Deep_hypertext_with_embedded_revision_co.pdf?dl=0
 
 (def types #{::map ::list}) ; ::rope ::counter
-(def speical-keywords #{::delete})
-(def root-id [0 "0"])
+(def special-keywords #{::hide ::show})
+(def root-id [0 "0" 0])
 (def root-node [root-id nil nil])
-(def uuid-length 21)
-(def site-id-length 13)
+(def ^:const uuid-length 21)
+(def ^:const site-id-length 13)
 
 (defn gen-string [length]
   (gen/fmap #(apply str %) (gen/vector (gen/char-alpha) length)))
 
 (spec/def ::type types)
-(spec/def ::lamport-ts nat-int?) ; AKA the index in a yarn
+(spec/def ::lamport-ts nat-int?) ; the logical insertion order (the index in a yarn)
 ; TODO: should a wall-clock-ts be added? If a central Datomic DB is used then nodes will get a wall clock ts based on when they were synced to the server...
 (spec/def ::uuid (spec/with-gen (spec/and string? #(= (count %) uuid-length))
                                 #(gen-string uuid-length)))
@@ -36,17 +36,19 @@
                                                        (= (count %) site-id-length)
                                                        (= % "0")))
                                    #(gen-string site-id-length)))
-(spec/def ::id (spec/tuple ::lamport-ts ::site-id))
+(spec/def ::tx-index nat-int?) ; the index in a transaction (every ::lamport-ts is a transaction of one or more insertions)
+(spec/def ::id (spec/tuple ::lamport-ts ::site-id ::tx-index))
 (spec/def ::key (spec/or :k keyword?
                          :s string?))
 (spec/def ::cause (spec/or :previous-list-item ::id
                            :map-key ::key))
-(spec/def ::value (spec/or :special-k speical-keywords
+(spec/def ::value (spec/or :special-k special-keywords
                            :c char?
                            :s string?
                            :k keyword?
                            :n number?
-                           :ct ::causal-tree))
+                           :ct ::causal-tree
+                           :other any?))
 
 ; AKA an atom in CT parlance.
 (spec/def ::node (spec/cat :id ::id
@@ -68,19 +70,26 @@
 (spec/def ::causal-tree (spec/keys :req [::nodes ::lamport-ts ::uuid ::site-id]
                                    :opt [::yarns ::weave]))
 
-(defn site-id [] (u/uid site-id-length))
+(defn new-site-id [] (u/new-uid site-id-length))
 
-(defn node
+(defn new-node
   "Helper function to create a node for insertion into a causal collection."
   ([[k v]] ; maps the keys / values in the ::nodes map back to nodes
    (into [k] v))
   ([lamport-ts site-id cause value]
-   [[lamport-ts site-id] cause value]))
-(spec/fdef node
+   (new-node lamport-ts site-id 0 cause value))
+  ([lamport-ts site-id tx-index cause value]
+   [[lamport-ts site-id tx-index] cause value]))
+(spec/fdef new-node
            :args (spec/or
                   :arity-1 (spec/cat :node-kv-tuple (spec/tuple ::id (spec/tuple ::cause ::value)))
+                  :arity-4 (spec/cat :lamport-ts ::lamport-ts
+                                     :site-id ::site-id
+                                     :cause ::cause
+                                     :value ::value)
                   :arity-5 (spec/cat :lamport-ts ::lamport-ts
                                      :site-id ::site-id
+                                     :tx-index ::tx-index
                                      :cause ::cause
                                      :value ::value))
            :ret ::node
@@ -93,7 +102,7 @@
   entire tree will be traversed and (re)indexed."
   ([causal-tree]
    (loop [ct1 causal-tree
-          sorted-nodes (map node (sort (::nodes causal-tree)))]
+          sorted-nodes (map new-node (sort (::nodes causal-tree)))]
      (if (empty? sorted-nodes)
        ct1
        (recur (spin ct1 (first sorted-nodes))
@@ -101,7 +110,7 @@
   ([causal-tree node]
    (let [site-id (second (first node))]
      (if-let [yarn (get-in causal-tree [::yarns site-id])]
-       (if (> (ffirst node) (ffirst (last yarn))) ; compare lamport timestamps
+       (if (> (ffirst node) (ffirst (peek yarn))) ; compare lamport timestamps
          (update-in causal-tree [::yarns site-id] conj node)
          (update-in causal-tree [::yarns site-id] u/insert node)) ; u/insert is expensive. Avoid it.
        (assoc-in causal-tree [::yarns site-id] [node])))))
@@ -113,7 +122,7 @@
   [weave-fn causal-tree node]
   (if-let [existing-node-body (get-in causal-tree [::nodes (first node)])]
     (if (= (rest node) existing-node-body)
-      causal-tree
+      causal-tree ; idempotency!
       (throw (ex-info "This node is already in the tree and can't be changed."
                       {:causes #{:append-only :edits-not-allowed}
                        :existing-node (cons (first node) existing-node-body)})))
@@ -134,7 +143,7 @@
   local site-id and lamport-ts."
   [weave-fn causal-tree cause value]
   (let [ct2 (update-in causal-tree [::lamport-ts] inc)
-        node (node (::lamport-ts ct2) (::site-id ct2) cause value)]
+        node (new-node (::lamport-ts ct2) (::site-id ct2) cause value)]
     (insert weave-fn ct2 node)))
 
 (defn refresh-ts
@@ -142,7 +151,7 @@
   Expects ::yarns cache to be up to date and sorted."
   [causal-tree]
   (->> (::yarns causal-tree)
-       (reduce #(max %1 (ffirst (last (last %2)))) 0)
+       (reduce #(max %1 (ffirst (peek (peek %2)))) 0)
        (assoc causal-tree ::lamport-ts)))
 
 (defn yarns->nodes
@@ -180,7 +189,7 @@
         (recur (as-> (get-in causal-tree [::yarns (second id)]) $
                      (take-while #(not= id (first %)) $)
                      (vec $)
-                     (conj $ (node [id (get-in causal-tree [::nodes id])]))
+                     (conj $ (new-node [id (get-in causal-tree [::nodes id])]))
                      (assoc-in new-ct [::yarns (second id)] $))
                (first more-ids) (rest more-ids))
         (-> new-ct
@@ -207,7 +216,7 @@
                      {:causes #{:uuid-missmatch}
                       :uuids [(::uuid causal-tree1) (::uuid causal-tree2)]}))
      :else (->> (::nodes causal-tree2)
-                (map node)
+                (map new-node)
                 (reduce (partial insert weave-fn) causal-tree1)))))
                 ; TODO: MAYBE: implement deep merge of cts in values.
                 ;       This includes atoms.
