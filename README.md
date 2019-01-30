@@ -59,12 +59,47 @@ Causal collections will automatically track the order values are inserted into t
 - [Real-time Collaborative Editing with CRDTs](https://www.infoq.com/presentations/crdt-tachyon-collaborative-editing) 📺 *video, javascript, rust, ropes*
   - A talk about the CRDT used for Atom's Teletype pair programming package. It has some of the clearest diagrams I've come across to explain their CRDT implementation.
 - [`aredington/schism`](https://github.com/aredington/schism) &nbsp; *cljc*
-  - Schism is very similar to cause, but without tombstones. It inspired a lot of the core cljc collection protocol implementations in cause.
+  - Schism is very similar to Cause, but without tombstones. It inspired a lot of the core cljc collection protocol implementations in Cause.
 - [`grizko/ron`](https://github.com/gritzko/ron) &nbsp; *compression, go*
-  - I'd love to find ways to compress the meta data in cause similarly to RON.
+  - I'd love to find ways to compress the meta data in Cause similarly to RON.
 - [CRDT - An approach to async plugins and undo](http://abishov.com/xi-editor/docs/crdt.html) 📝 *blog, go, xi, ropes*
 - [A Conflict-Free Replicated JSON Datatype](https://arxiv.org/pdf/1608.03960.pdf) 📄 *paper, json*
   - And [`automerge/automerge`](https://github.com/automerge/automerge) (the js implementation). This is the dream, but I want it in EDN instead of JSON and with more idiomatic ways of operating on the data (Clojure's core collection functions).
 
 - [Out of the Tar Pit](http://curtclifton.net/papers/MoseleyMarks06a.pdf) 📄 *paper, philosophy*
   - This paper along with the talk [Simple Made Easy 📺](https://www.infoq.com/presentations/Simple-Made-Easy) explain the value of immutability and pure functions. I'm sometimes tempted to introduce a little mutable state (some side effects) to enable some syntactic sugar or performance that cannot be had otherwise, but the tradeoff in my ability to reason about what the CRDT is doing has always been too high to commit those changes. I'm not against introducing mutable state, there just has to be a really good reason.
+
+## Roadmap
+
+- [x] Spec generic causal tree data type
+- [x] Implement `CausalList`
+- [x] Generate tests to check if the CausalList `weave` function is idempotent and turn breaking edge cases into unit tests. Fix the edge cases.
+- [x] Basic merge and weft (time travel) functions. Needs revision.
+- [x] Implement `CausalMap`
+- [x] Implement common Clojure collection protocols in CLJ(S) for CausalList and CausalMap
+- [x] Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes. This mostly came from me stupidly using `last` instead of `peek`.
+- [x] Add transaction support to the data model via `tx-index`
+- [x] Full test coverage for collection protocol implementations
+- [ ] Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
+- [ ] History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal tree data type.
+- [ ] Nested collection helper functions
+  - [ ] Shared lamport-ts between collections
+  - [ ] Transacting across multiple collections
+  - [ ] History across multiple collections
+- [ ] Improved merge / sync functions. Particularly ways to conveniently sync E2E over a distributed p2p network. Add examples using common packages that support (WebSockets, WebWorkers and WebRTC). Helper functions to make the integration simpler.
+  - [ ] Also make some decisions around chattiness and ideal distributed network topologies. Hopefully this can be in the form of a recommended library, but some of the decisions might be specific to distributing a causal tree across many clients
+- [ ] Generative property based E2E tests with nested collections that share history
+  - [ ] Are changes commutative, associative and idempotent regardless of network latency
+  - [ ] Can clients recover from errors and potentially request more data if they don't have the nodes they need to perform a merge
+  - [ ] Have a way to simulate merge times. E.g. Merging S sites with N nodes each will take T milliseconds in CLJS. This should probably be available directly on the CLI so consumers of this package can easily estimate their loads.
+- [ ] Last chance to make major changes to API
+- [ ] 🚀 Publish 0.1.0 as an initial release to Clojars
+  - [ ] Make sure tools-deps still works with filesytem and vcs too
+- [ ] CLJS CausalList specific performance tuning. The weave algorithm currently take O(n) across ALL nodes and tombstones in a list, can that be brought down? If not are their constant time performance improvements to be found? Is it worth using mutable data structures inside the weave function?
+- [ ] Research E2E encryption for causal collections
+- [ ] Implement `CausalRope`. This is not core to Clojure, but would be convenient for text editing.
+- [ ] Implement `CausalVector`... I don't know how feasible this is, but it would be nice to have
+- [ ] Implement `CausalCounter`
+- [ ] Implement `CausalSet`. Not a high priority, but would be nice to round out the collection types
+- [ ] 🚀 Publish 1.0.0 with stable API
+- [ ] Research CLJS -> Rust (Wasm) port of internal core insert / weave functions. Are there big enough performance enhancements to offset the added complexity / time. How far along is the Wasm JVM? Can running the JVM in a browser with Cause CLJ provide the desired performance properties?
