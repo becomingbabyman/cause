@@ -74,7 +74,7 @@ Causal collections will automatically track the order values are inserted into t
 - [x] 🧶 Spec generic causal tree data type
 - [x] ⭐️ Implement `CausalList`
 - [x] ✅ Generate tests to check if the CausalList `weave` function is idempotent and turn breaking edge cases into unit tests. Fix the edge cases.
-- [x] Basic merge and weft (time travel) functions. Needs revision.
+- [x] ⏳ Basic merge and weft (time travel) functions. Needs revision.
 - [x] 🗺 Implement `CausalMap`
 - [x] ƛ Implement common Clojure collection protocols in CLJ(S) for CausalList and CausalMap
 - [x] 🏎 Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes. This mostly came from me stupidly using `last` instead of `peek`.
