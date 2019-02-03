@@ -71,35 +71,37 @@ Causal collections will automatically track the order values are inserted into t
 
 ## Roadmap
 
-- [x] Spec generic causal tree data type
-- [x] Implement `CausalList`
-- [x] Generate tests to check if the CausalList `weave` function is idempotent and turn breaking edge cases into unit tests. Fix the edge cases.
+- [x] 🧶 Spec generic causal tree data type
+- [x] ⭐️ Implement `CausalList`
+- [x] ✅ Generate tests to check if the CausalList `weave` function is idempotent and turn breaking edge cases into unit tests. Fix the edge cases.
 - [x] Basic merge and weft (time travel) functions. Needs revision.
-- [x] Implement `CausalMap`
-- [x] Implement common Clojure collection protocols in CLJ(S) for CausalList and CausalMap
-- [x] Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes. This mostly came from me stupidly using `last` instead of `peek`.
-- [x] Add transaction support to the data model via `tx-index`
-- [x] Full test coverage for collection protocol implementations
-- [ ] Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
-- [ ] History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal tree data type.
-- [ ] Nested collection helper functions
+- [x] 🗺 Implement `CausalMap`
+- [x] ƛ Implement common Clojure collection protocols in CLJ(S) for CausalList and CausalMap
+- [x] 🏎 Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes. This mostly came from me stupidly using `last` instead of `peek`.
+- [x] 🥞 Add transaction support to the data model via `tx-index`
+- [x] ✅ Full test coverage for collection protocol implementations
+- [ ] 🥞 Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
+  - [ ] Transactions should also weave contiguous sequences in O(n+m) instead of the current O(n*m), where n is all woven nodes and m is nodes in the transaction.
+- [ ] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal tree data type.
+- [ ] ⫷ Nested collection helper functions
   - [ ] Shared lamport-ts between collections
   - [ ] Transacting across multiple collections
   - [ ] History across multiple collections
-- [ ] Improved merge / sync functions. Particularly ways to conveniently sync E2E over a distributed p2p network. Add examples using common packages that support (WebSockets, WebWorkers and WebRTC). Helper functions to make the integration simpler.
+- [ ] 👋 Improved merge / sync functions. Particularly ways to conveniently sync E2E over a distributed p2p network. Add examples using common packages that support (WebSockets, WebWorkers and WebRTC). Helper functions to make the integration simpler.
   - [ ] Also make some decisions around chattiness and ideal distributed network topologies. Hopefully this can be in the form of a recommended library, but some of the decisions might be specific to distributing a causal tree across many clients
-- [ ] Generative property based E2E tests with nested collections that share history
+- [ ] ✅ Generative property based E2E tests with nested collections that share history
   - [ ] Are changes commutative, associative and idempotent regardless of network latency
   - [ ] Can clients recover from errors and potentially request more data if they don't have the nodes they need to perform a merge
   - [ ] Have a way to simulate merge times. E.g. Merging S sites with N nodes each will take T milliseconds in CLJS. This should probably be available directly on the CLI so consumers of this package can easily estimate their loads.
-- [ ] Last chance to make major changes to API
+- [ ] ♳ Last chance to make major changes to API
 - [ ] 🚀 Publish 0.1.0 as an initial release to Clojars
   - [ ] Make sure tools-deps still works with filesytem and vcs too
-- [ ] CLJS CausalList specific performance tuning. The weave algorithm currently take O(n) across ALL nodes and tombstones in a list, can that be brought down? If not are their constant time performance improvements to be found? Is it worth using mutable data structures inside the weave function?
-- [ ] Research E2E encryption for causal collections
-- [ ] Implement `CausalRope`. This is not core to Clojure, but would be convenient for text editing.
-- [ ] Implement `CausalVector`... I don't know how feasible this is, but it would be nice to have
-- [ ] Implement `CausalCounter`
-- [ ] Implement `CausalSet`. Not a high priority, but would be nice to round out the collection types
+- [ ] 🏎 CLJS CausalList specific performance tuning. The weave algorithm currently take O(n) across ALL nodes and tombstones in a list, can that be brought down? If not are their constant time performance improvements to be found? Is it worth using mutable data structures inside the weave function?
+- [ ] 🔒 Research E2E encryption for causal collections
+- [ ] 🧗‍♀️ Implement `CausalRope`. This is not core to Clojure, but would be convenient for text editing.
+- [ ] → Implement `CausalVector`... I don't know how feasible this is, but it would be nice to have
+- [ ] ∆ Implement `CausalCounter`
+- [ ] ∪ Implement `CausalSet`. Not a high priority, but would be nice to round out the collection types
 - [ ] 🚀 Publish 1.0.0 with stable API
-- [ ] Research CLJS -> Rust (Wasm) port of internal core insert / weave functions. Are there big enough performance enhancements to offset the added complexity / time. How far along is the Wasm JVM? Can running the JVM in a browser with Cause CLJ provide the desired performance properties?
+- [ ] 🚮 Add garbage collection to weaves. Nodes will never be deleted from the nodes map, but they can be removed from the sorted weave cache when no active nodes depend on them. This will significantly improve read and write performance on causal collections with many hidden nodes. And since the nodes still exist in the nodes map they can always be added back to the weave if a merge from another site comes in that was "caused" by garbage collected nodes.
+- [ ] ⚙️ Research CLJS -> Rust (Wasm) port of internal core insert / weave functions. Are there big enough performance enhancements to offset the added complexity / time. How far along is the Wasm JVM? Can running the JVM in a browser with Cause CLJ provide the desired performance properties?
