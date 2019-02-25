@@ -58,7 +58,8 @@
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave [])
            (map s/new-node (sort (::s/nodes causal-tree)))))
-  ([causal-tree node & more-consecutive-nodes-in-same-tx]
+  ([causal-tree node] (weave causal-tree node nil))
+  ([causal-tree node more-consecutive-nodes-in-same-tx]
    (if (not (get-in causal-tree [::s/nodes (first node)]))
      causal-tree
      (loop [left []

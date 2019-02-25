@@ -96,7 +96,7 @@
            :fn (spec/and #(not= (first (:ret %)) (get-in % [:args :cause])))) ; cause can't equal node-id
 
 (defn get-tx
-  "Returns the transaction data in a node"
+  "Returns the transaction tuple in a node"
   [node] (drop-last (first node)))
 
 (defn assoc-nodes
@@ -128,8 +128,10 @@
        ct1
        (recur (spin-sequential ct1 [(first sorted-nodes)])
               (rest sorted-nodes)))))
-  ([causal-tree node & more-nodes]
-   (if more-nodes
+  ([causal-tree node] (spin causal-tree node nil))
+  ([causal-tree node more-nodes]
+   (if (not more-nodes)
+     (spin-sequential causal-tree [node])
      (let [nodes (into [node] more-nodes)
            is-sequential? (reduce #(and %1 (= (first (ffirst %2))
                                               (second (second (second %2)))))
@@ -141,8 +143,7 @@
                 more-nodes more-nodes]
            (if node
              (recur (spin-sequential ct [node]) (first more-nodes) (rest more-nodes))
-             ct))))
-     (spin-sequential causal-tree [node]))))
+             ct)))))))
 
 (defn insert
   "Inserts an arbitrary node from any site and any point in time. If the
@@ -170,13 +171,12 @@
                (not (get-in causal-tree [::nodes (second node)])))
         (throw (ex-info "The cause of this node is not in the tree."
                         {:causes #{:cause-must-exist}}))
-        (as-> (if (> (ffirst node) (::lamport-ts causal-tree))
-                (assoc-in causal-tree [::lamport-ts] (ffirst node))
-                causal-tree)
-              ct
-              (assoc-nodes ct nodes)
-              (apply spin ct node more-nodes-in-tx)
-              (apply weave-fn ct node more-nodes-in-tx))))))
+        (-> (if (> (ffirst node) (::lamport-ts causal-tree))
+              (assoc-in causal-tree [::lamport-ts] (ffirst node))
+              causal-tree)
+            (assoc-nodes nodes)
+            (spin node more-nodes-in-tx)
+            (weave-fn node more-nodes-in-tx))))))
 
 (defn append
   "Similar to insert, but automatically calculates node id based on the

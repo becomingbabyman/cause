@@ -30,7 +30,8 @@
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave {})
            (map s/new-node (sort (::s/nodes causal-tree)))))
-  ([causal-tree [id k v :as node] & more-nodes]
+  ([causal-tree node] (weave causal-tree node nil))
+  ([causal-tree [id k v :as node] more-nodes]
    (if (not (get-in causal-tree [::s/nodes id]))
      causal-tree
      (loop [left []
@@ -40,7 +41,7 @@
                  (<< (first nr) id))
            (let [ct (assoc-in causal-tree [::s/weave k]
                               (into left cat [[[id v]] right]))]
-             (if more-nodes (apply weave ct more-nodes) ct))
+             (if more-nodes (weave ct (first more-nodes) (next more-nodes)) ct))
            (recur (conj left nr) (rest right))))))))
 
 (defn active-node
