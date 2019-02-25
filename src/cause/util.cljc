@@ -1,5 +1,5 @@
 (ns cause.util
-  (:require [nano-id.core :refer [nano-id]]))
+  (:require [nano-id.custom :refer [generate]]))
 
 (defn <<
   "Return non-nil if runs of any type are in
@@ -9,6 +9,9 @@
   ([a b & more]
    (and (<< a b) (apply << b more))))
 
+(def first-char-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz") ; Makes all uids valid keywords
+(def id-alphabet (str "0123456789" first-char-alphabet))
+(def my-nano-id (generate id-alphabet))
 (defn new-uid
   "Returns a globally unique ID, encoded to take up as little
   space as possible. See this site for help picking a reasonable
@@ -16,8 +19,8 @@
   nano-id is 21 which maps similarly to the uniqueness of most uuid
   generators and is a good default if your scope is not bounded."
   ; TODO: consider the tradoffs of nano-id compared to a standard uuid implmentation https://www.itu.int/en/ITU-T/asn1/Pages/UUID/uuids.aspx
-  ([] (nano-id))
-  ([length] (nano-id length)))
+  ([] (new-uid 21))
+  ([length] (str (rand-nth first-char-alphabet) (my-nano-id (dec length)))))
 
 (defn sorted-insertion-index
   "Returns the insertion index for the target assuming the collection
@@ -40,9 +43,9 @@
   core clojure seq functions like conj over this, for better performance.
   If no index is specified, assume the vector is sorted and try to maintain
   the sort on insert."
-  ([coll val] (if-let [i (sorted-insertion-index coll val {:uniq true})]
-                (insert coll i val) coll))
-  ([coll i val] (into (subvec coll 0 i) cat [[val] (subvec coll i)])))
+  ([coll val opts] (if-let [i (sorted-insertion-index coll val {:uniq true})]
+                     (insert coll i val opts) coll))
+  ([coll i val {:keys [next-vals]}] (into (subvec coll 0 i) cat [[val] next-vals (subvec coll i)])))
 
 (defmacro redef
   "Moves a symbol to the current ns, preserving the docstring and arglists."

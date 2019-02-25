@@ -2,6 +2,35 @@
 
 > An EDN-like CRDT (Causal Tree) for Clojure(Script) that automatically tracks history and resolves conflicts. This implementation takes a lot of cues from [Data Laced with History](http://archagon.net/blog/2018/03/24/data-laced-with-history/) and many papers on the topic of CRDTs.
 
+## How it Works
+
+- Causal collections (lists, maps) are made of nodes
+  - `node` - a triplet made of `[id cause value]`
+    - `id` - an easily sortable triplet of `[lamport-ts site-id tx-index]`
+      - `lamport-ts` - a logical clock incremented on every transaction. A natural int counter starting at `0`.
+      - `site-id` - a random uid that represents a location (your computer, my computer)
+      - `tx-index` - the order within a transaction. A natural int counter that is reset to `0` at the start of every transaction.
+        - A transaction is when both `lamport-ts` and `site-id` are the same for multiple nodes. Then `tx-index` serves as the tie breaker
+      - sorting ids
+        - first on logical time `lamport-ts`
+        - if multiple times collide they are sorted on location `site-id`
+        - if multiple nodes are inserted at the same time on the same machine that's a transaction and `tx-index` is used keep them unique and ordered
+    - `cause` - the identifier that "caused" a node
+      - in a list `cause` is the `id` of the preceding node, creating a linked list
+      - in a map `cause` is the `key`
+    - `value` is whatever you set it to, a string, a keyword, another causal collection
+      - since causal collections are append only, if you want to delete (hide) a value you must append a `cause/hide` value. This is non destructive and enables synchronization and time travel.
+
+Nodes are all you need. From an unordered pile of nodes we can consistently weave (order) them every time. Nodes are also unique so we can deduplicate them across a chatty network. And they include complete history information: time = `lamport-ts`, who = `site-id`, transaction = `lamport-ts` and `site-id`, tx order = `tx-index`. They do not include wall clock time, but they do have everything needed for infinite undo / redo as well as version control and blame tracking.
+
+Cause trades a constant increase in spacial complexity for all the properties above. Lists are the most complicated to keep sorted and suffer from a linearly increasing time complexity on both reads and writes. Fortunately transacting contiguous sequences is O(n + m) and not O(n * m), so operations like pasting a large sequence stays linear.
+
+## Installation
+
+The API and data structures have no guarantee of stability until 0.1.0 is published ([See Roadmap](https://github.com/smothers/cause#roadmap)).
+
+If you want to try this pre-release code that will likely change you can use [git deps](https://www.clojure.org/news/2018/01/05/git-deps).
+
 ## Development
 
 #### Test CLJ
@@ -94,6 +123,7 @@ Causal collections will automatically track the order values are inserted into t
   - [ ] Are changes commutative, associative and idempotent regardless of network latency
   - [ ] Can clients recover from errors and potentially request more data if they don't have the nodes they need to perform a merge
   - [ ] Have a way to simulate merge times. E.g. Merging S sites with N nodes each will take T milliseconds in CLJS. This should probably be available directly on the CLI so consumers of this package can easily estimate their loads.
+- [ ] 🧹 Consider replacing positional semantics where reasonable. Ids benefit from being vecs due to sorting, but nodes could probably be maps `{:id :cause :value}`
 - [ ] ♳ Last chance to make major changes to API
 - [ ] 🚀 Publish 0.1.0 as an initial release to Clojars
   - [ ] Make sure tools-deps still works with filesytem and vcs too
@@ -106,3 +136,8 @@ Causal collections will automatically track the order values are inserted into t
 - [ ] 🚀 Publish 1.0.0 with stable API
 - [ ] 🚮 Add garbage collection to weaves. Nodes will never be deleted from the nodes map, but they can be removed from the sorted weave cache when no active nodes depend on them. This will significantly improve read and write performance on causal collections with many hidden nodes. And since the nodes still exist in the nodes map they can always be added back to the weave if a merge from another site comes in that was "caused" by garbage collected nodes.
 - [ ] ⚙️ Research CLJS -> Rust (Wasm) port of internal core insert / weave functions. Are there big enough performance enhancements to offset the added complexity / time. How far along is the Wasm JVM? Can running the JVM in a browser with Cause CLJ provide the desired performance properties?
+- [ ] 🧨 Research mitigating / recovering from, intentionally malicious sites and forged nodes.
+  - [ ] Document attack / corruption vectors. E.g. Inserting non linear lamport-ts. Impersonating other site-ids...
+  - [ ] Add more logging facilities so that in the case of a malicious site other sites can manually rollback and recover to a "correct" state
+  - [ ] See if automatic attack detection / prevention is feasible
+    - [ ] Maybe make it optional in exchange for poorer performance characteristics

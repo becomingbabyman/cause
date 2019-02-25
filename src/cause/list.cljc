@@ -51,11 +51,14 @@
 
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
-  If a node is passed only that node will be woven in O(n)."
+  If a node is passed only that node will be woven in O(n). If
+  more nodes are passed after the initial node they will be
+  woven in immediately after `node`, keeping the complexity at O(n)
+  when weaving in transactions of node sequences."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave [])
            (map s/new-node (sort (::s/nodes causal-tree)))))
-  ([causal-tree node]
+  ([causal-tree node & more-consecutive-nodes-in-same-tx]
    (if (not (get-in causal-tree [::s/nodes (first node)]))
      causal-tree
      (loop [left []
@@ -67,7 +70,7 @@
              asap (or prev-asap (weave-asap? nl node nr))]
          (if (or (empty? right)
                  (and asap (not (weave-later? nl node nr seen-since-asap))))
-           (assoc causal-tree ::s/weave (into left cat [[node] right]))
+           (assoc causal-tree ::s/weave (into left cat [[node] more-consecutive-nodes-in-same-tx right]))
            (recur (conj left nr) (rest right) asap (if asap
                                                      (assoc seen-since-asap
                                                             (first nl) true)
