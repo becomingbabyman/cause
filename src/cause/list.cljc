@@ -158,8 +158,9 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
-                                                     :ct (.-ct o)}))))
+        (-write writer (str "#causal/list " (pr-str (s/causal->edn o)))))
+        ; (-write writer (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
+        ;                                              :ct (.-ct o)}))))
 
       IHash
       (-hash [this] (-hash (.-ct this)))
@@ -177,8 +178,9 @@
       (-with-meta [this meta] (CausalList. (-with-meta (.-ct this) meta)))))
 
 #? (:clj (defmethod print-method CausalList [^CausalList o ^java.io.Writer w]
-           (.write w (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
-                                                   :ct (.ct o)})))))
+           (.write w (str "#causal/list " (pr-str (s/causal->edn o))))))
+           ; (.write w (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
+           ;                                         :ct (.ct o)})))))
 
 (defn read-edn-map
   [read-object]

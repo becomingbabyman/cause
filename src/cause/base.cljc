@@ -63,7 +63,7 @@
   (println "new-node")
   [(inc tx-index)
    (s/new-node (::s/lamport-ts cb) (::s/site-id cb) (or tx-index 0)
-               (or cause s/root-id) value)])
+               cause value)])
 
 (defn insert ; ✅
   "Inserts the `nodes` in a causal collection specified by `uuid` and
@@ -90,32 +90,57 @@
 
 ;
 ;
+(declare flatten-value)
+
 (defn map->nodes
-  "Returns `[tx-index nodes]`"
+  "Returns `[cb tx-index nodes]`"
   [cb tx-index map-value]
-  (reduce-kv (fn [acc k v]
-               (let [[tx-index node] (new-node cb (first acc) k v)]
-                 [tx-index (into (peek acc) node)]))
-             [tx-index []]
+  (reduce-kv (fn [[cb tx-index nodes] k v]
+               (let [[cb tx-index flat-v] (flatten-value cb tx-index v :preserve-strings? true)
+                     [tx-index node] (new-node cb tx-index k flat-v)]
+                 [cb tx-index (conj nodes node)]))
+             [cb tx-index []]
              map-value))
 (comment
-  (map->nodes (new-causal-base) 0 {:a 1 :b 2 :c 3}))
+  (map->nodes (new-causal-base) 0 {:a 1 :b 2}))
 
-(defn flatten-map
-  [cb tx-index map-value]
-  (let [[cb uuid] (add-collection-of-this-values-type-to-cb cb map-value)
-        [tx-index nodes] (map->nodes cb tx-index map-value)
+(defn list->nodes
+  "Returns `[cn tx-index nodes last-id]`"
+  [cb tx-index list-value]
+  (reduce (fn [[cb tx-index nodes cause] v]
+            (let [[cb tx-index flat-v] (flatten-value cb tx-index v)
+                  [tx-index node] (new-node cb tx-index cause flat-v)]
+              [cb tx-index (conj nodes node) (first node)]))
+          [cb tx-index [] s/root-id]
+          list-value))
+(comment
+  (list->nodes (new-causal-base) 0 [1 2 3]))
+
+(defn flatten-collection
+  [cb tx-index value node-fn]
+  (let [[cb uuid] (add-collection-of-this-values-type-to-cb cb value)
+        [cb tx-index nodes] (node-fn cb tx-index value)
         cb (insert cb uuid nodes)
         map-ref (uuid->ref uuid)]
     [cb tx-index map-ref]))
-(comment
-  (flatten-map (new-causal-base) 0 {:a 1 :b 2}))
 
-(defn nested-maps->nodes
-  "Returns `[cb tx-index nodes]`"
-  [cb tx-index map-value])
+(defn flatten-value
+  [cb tx-index value & {:keys [preserve-strings?]}]
+  (cond
+    (and preserve-strings? (string? value)) [cb tx-index value]
+    (map? value) (flatten-collection cb tx-index value map->nodes)
+    (seqable? value) (flatten-collection cb tx-index value list->nodes)
+    :else [cb tx-index value]))
 (comment
-  (nested-maps->nodes (new-causal-base) 0 {:a {:aa 1 :bb 2 :cc 3}}))
+  ; map
+  (flatten-value (new-causal-base) 0 {:a {:aa 1 :bb 2 :cc 3}})
+  (flatten-value (new-causal-base) 0 {:a {:b {:c :d}}})
+  ; list
+  (flatten-value (new-causal-base) 0 [1 [2 [3]]])
+  (flatten-value (new-causal-base) 0 [1 "hello" "world"])
+  ; combo
+  (flatten-value (new-causal-base) 0 [:div {:title "don't break"}
+                                      [:span "break"]]))
 ;
 ;
 
