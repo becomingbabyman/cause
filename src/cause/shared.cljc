@@ -133,9 +133,10 @@
    (if (not more-nodes)
      (spin-sequential causal-tree [node])
      (let [nodes (into [node] more-nodes)
-           is-sequential? (reduce #(and %1 (= (first (ffirst %2))
-                                              (second (second (second %2)))))
-                                  true (partition 2 1 nodes))]
+           is-sequential? (and (= ::list (::type causal-tree))
+                               (reduce #(and %1 (= (first (ffirst %2))
+                                                   (second (second (second %2)))))
+                                       true (partition 2 1 nodes)))]
        (if is-sequential?
          (spin-sequential causal-tree nodes)
          (loop [ct causal-tree
@@ -149,34 +150,36 @@
   "Inserts an arbitrary node from any site and any point in time. If the
   node's ts is greater than the local ts then the local ts will be
   fastforwared to match."
-  [weave-fn causal-tree node & more-nodes-in-tx]
-  (let [nodes (into [node] more-nodes-in-tx)
-        txs (reduce #(conj %1 (get-tx %2)) #{} nodes)]
-    ; TODO: REFACTOR: this sort of check should go in the specific causal
-    ;  collection that cares about this validaiton. E.g. lists also care
-    ;  that all the node ids / causes are monotonically increasing.
-    (when (< 1 (count txs))
-      (throw (ex-info "All nodes must belong to the same tx."
-                      {:txs txs})))
-    (if-let [existing-node-body (get-in causal-tree [::nodes (first node)])]
-      (if (= (rest node) existing-node-body)
-        causal-tree ; idempotency!
-        (throw (ex-info "This node is already in the tree and can't be changed."
-                        {:causes #{:append-only :edits-not-allowed}
-                         :existing-node (cons (first node) existing-node-body)})))
-      ; TODO: UNHACK: this makes assumptions relating to how CausalMaps and CausalLists work.
-      ;  The idea that keys as causes are allowed is tru for maps, but not for lists.
-      ;  And in any case this fn should not need to know about either of them, just causal-trees.
-      (if (and (not (spec/valid? ::key (second node))) ; if the cause is a ::key we can ignore this check
-               (not (get-in causal-tree [::nodes (second node)])))
-        (throw (ex-info "The cause of this node is not in the tree."
-                        {:causes #{:cause-must-exist}}))
-        (-> (if (> (ffirst node) (::lamport-ts causal-tree))
-              (assoc-in causal-tree [::lamport-ts] (ffirst node))
-              causal-tree)
-            (assoc-nodes nodes)
-            (spin node more-nodes-in-tx)
-            (weave-fn node more-nodes-in-tx))))))
+  ([weave-fn causal-tree node]
+   (insert weave-fn causal-tree node nil))
+  ([weave-fn causal-tree node more-nodes-in-tx]
+   (let [nodes (into [node] more-nodes-in-tx)
+         txs (reduce #(conj %1 (get-tx %2)) #{} nodes)]
+     ; TODO: REFACTOR: this sort of check should go in the specific causal
+     ;  collection that cares about this validaiton. E.g. lists also care
+     ;  that all the node ids / causes are monotonically increasing.
+     (when (< 1 (count txs))
+       (throw (ex-info "All nodes must belong to the same tx."
+                       {:txs txs})))
+     (if-let [existing-node-body (get-in causal-tree [::nodes (first node)])]
+       (if (= (rest node) existing-node-body)
+         causal-tree ; idempotency!
+         (throw (ex-info "This node is already in the tree and can't be changed."
+                         {:causes #{:append-only :edits-not-allowed}
+                          :existing-node (cons (first node) existing-node-body)})))
+       ; TODO: UNHACK: this makes assumptions relating to how CausalMaps and CausalLists work.
+       ;  The idea that keys as causes are allowed is tru for maps, but not for lists.
+       ;  And in any case this fn should not need to know about either of them, just causal-trees.
+       (if (and (not (spec/valid? ::key (second node))) ; if the cause is a ::key we can ignore this check
+                (not (get-in causal-tree [::nodes (second node)])))
+         (throw (ex-info "The cause of this node is not in the tree."
+                         {:causes #{:cause-must-exist}}))
+         (-> (if (> (ffirst node) (::lamport-ts causal-tree))
+               (assoc-in causal-tree [::lamport-ts] (ffirst node))
+               causal-tree)
+             (assoc-nodes nodes)
+             (spin node more-nodes-in-tx)
+             (weave-fn node more-nodes-in-tx)))))))
 
 (defn append
   "Similar to insert, but automatically calculates node id based on the

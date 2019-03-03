@@ -227,8 +227,11 @@
   (get-ts [this] (::s/lamport-ts (.-ct this)))
   (get-site-id [this] (::s/site-id (.-ct this)))
   (get-weave [this] (::s/weave (.-ct this)))
-  (insert [this node]
-    (CausalMap. (s/insert weave (.-ct this) node)))
+  (insert
+    ([this node]
+     (CausalMap. (s/insert weave (.-ct this) node)))
+    ([this node more-nodes]
+     (CausalMap. (s/insert weave (.-ct this) node more-nodes))))
   (append [this cause value]
     (CausalMap. (s/append weave (.-ct this) cause value)))
   (weft [this ids-to-cut-yarns]

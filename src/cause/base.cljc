@@ -73,8 +73,8 @@
   (println "insert")
   (let [reverse-paths (map #(do [(first %) uuid]) nodes)]
     (-> cb
-        (update-in [::collections uuid] #(apply c/insert % nodes)))))
-        ; (update ::history u/insert (first reverse-paths) {:next-vals (next reverse-paths)}))))
+        (update-in [::collections uuid] #(c/insert % (first nodes) (rest nodes)))
+        (update ::history u/insert (first reverse-paths) {:next-vals (next reverse-paths)}))))
 
 (defn add-collection-of-this-values-type-to-cb [cb value & {:keys [is-root?]}] ; ✅
   (println "add-collection-of-this-values-type-to-cb")
@@ -114,7 +114,6 @@
 (defn nested-maps->nodes
   "Returns `[cb tx-index nodes]`"
   [cb tx-index map-value])
-
 (comment
   (nested-maps->nodes (new-causal-base) 0 {:a {:aa 1 :bb 2 :cc 3}}))
 ;

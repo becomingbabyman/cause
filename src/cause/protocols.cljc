@@ -13,7 +13,7 @@
   ; (get-nodes [causal])
   ; (get-yarns [causal])
   ; (get-ct [causal])
-  (insert [causal node]
+  (insert [causal node] [causal node more-nodes-in-tx]
     "Insert a node in the causal collection.")
   (append [causal cause value]
     "Creates a node from a cause and a value and inserts it
