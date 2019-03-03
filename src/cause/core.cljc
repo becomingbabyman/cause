@@ -42,6 +42,7 @@
 
 (redef causal->edn s/causal->edn)
 
+; TODO: DEPRECATE: encourage the use of causal-base instead
 (defn edn->causal
   "Takes an EDN value and returns a Causal value. EDN collections become
   Causal collections. Strings will stay whole when used as values in maps, but
