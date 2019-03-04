@@ -50,14 +50,7 @@
 (defn cb->edn [cb]
   (println "TODO: edn"))
 
-(comment
-  (do
-    (def cb (new-causal-base))
-    (transact cb [[nil nil {:a 1}]])
-    (transact cb [[123 [0 0 0] {:a 1}]])
-    (transact cb [[nil nil [1 2 3 {:a 1}]]])))
-
-(defn new-node ; ✅
+(defn new-node
   "Returns a new local node and an incremented tx-index `[tx-index node]`"
   [cb tx-index cause value]
   (println "new-node")
@@ -65,7 +58,7 @@
    (s/new-node (::s/lamport-ts cb) (::s/site-id cb) (or tx-index 0)
                cause value)])
 
-(defn insert ; ✅
+(defn insert
   "Inserts the `nodes` in a causal collection specified by `uuid` and
   updates the history of the containing `cb`. List nodes must be
   sequential. Returns a cb"
@@ -76,7 +69,7 @@
         (update-in [::collections uuid] #(c/insert % (first nodes) (rest nodes)))
         (update ::history u/insert (first reverse-paths) {:next-vals (next reverse-paths)}))))
 
-(defn add-collection-of-this-values-type-to-cb [cb value & {:keys [is-root?]}] ; ✅
+(defn add-collection-of-this-values-type-to-cb [cb value & {:keys [is-root?]}]
   (println "add-collection-of-this-values-type-to-cb")
   (if-let [causal (cond
                     (map? value) (c/new-causal-map)
@@ -88,8 +81,6 @@
       [cb uuid])
     [cb nil]))
 
-;
-;
 (declare flatten-value)
 
 (defn map->nodes
@@ -105,14 +96,19 @@
   (map->nodes (new-causal-base) 0 {:a 1 :b 2}))
 
 (defn list->nodes
-  "Returns `[cn tx-index nodes last-id]`"
-  [cb tx-index list-value]
-  (reduce (fn [[cb tx-index nodes cause] v]
-            (let [[cb tx-index flat-v] (flatten-value cb tx-index v)
-                  [tx-index node] (new-node cb tx-index cause flat-v)]
-              [cb tx-index (conj nodes node) (first node)]))
-          [cb tx-index [] s/root-id]
-          list-value))
+  "Returns `[cb tx-index nodes last-node-id]`"
+  ([cb tx-index list-value]
+   (list->nodes cb tx-index list-value nil))
+  ([cb tx-index list-value cause]
+   (reduce (fn [[cb tx-index nodes cause] v]
+             (if (string? v)
+               (let [[cb tx-index more-nodes next-cause] (list->nodes cb tx-index v cause)]
+                 [cb tx-index (into nodes more-nodes) next-cause])
+               (let [[cb tx-index flat-v] (flatten-value cb tx-index v)
+                     [tx-index node] (new-node cb tx-index cause flat-v)]
+                 [cb tx-index (conj nodes node) (first node)])))
+           [cb tx-index [] (or cause s/root-id)]
+           list-value)))
 (comment
   (list->nodes (new-causal-base) 0 [1 2 3]))
 
@@ -121,11 +117,12 @@
   (let [[cb uuid] (add-collection-of-this-values-type-to-cb cb value)
         [cb tx-index nodes] (node-fn cb tx-index value)
         cb (insert cb uuid nodes)
-        map-ref (uuid->ref uuid)]
-    [cb tx-index map-ref]))
+        collection-ref (uuid->ref uuid)]
+    [cb tx-index collection-ref]))
 
 (defn flatten-value
   [cb tx-index value & {:keys [preserve-strings?]}]
+  (println "flatten-value")
   (cond
     (and preserve-strings? (string? value)) [cb tx-index value]
     (map? value) (flatten-collection cb tx-index value map->nodes)
@@ -141,70 +138,39 @@
   ; combo
   (flatten-value (new-causal-base) 0 [:div {:title "don't break"}
                                       [:span "break"]]))
-;
-;
 
-; (defn handle-tx-map-value [cb [uuid cause value :as tx] tx-index]
-;   (println "TODO: map")
-;   (let [causal (c/new-causal-map)
-;         cb (assoc-in cb [::collections (c/get-uuid causal)] causal)
-;         [tx-index causal-node] (new-node cb tx-index cause (causal->ref causal))
-;         cb (insert cb uuid [causal-node])
-;         [map-nodes tx-index] (reduce-kv (fn [[nodes tx-index] k v]
-;                                           (println "TODO: what if v is another collection?")
-;                                           (let [[tx-index n] (new-node cb tx-index k v)]
-;                                             [(conj nodes n) tx-index]))
-;                                         [[] tx-index] value)
-;         cb (insert cb (c/get-uuid causal) map-nodes)]
-;     [cb tx-index]))
-;
-; (defn handle-tx-list-value [cb [uuid cause value :as tx] tx-index]
-;   (println "TODO: seqable"))
+(defn value->nodes
+  "Returns `[cb tx-index nodes]`"
+  [cb tx-index cause value]
+  (println "value->nodes")
+  (cond
+    ; (and preserve-strings? (string? value)) [cb tx-index value]
+    (map? value) (map->nodes cb tx-index value)
+    (seqable? value) (list->nodes cb tx-index value cause)
+    :else (let [[tx-index node] (new-node cb tx-index cause value)]
+            [cb tx-index [node]])))
 
-(defn reducer-value->node ; ✅
-  "A reducible fn for building seqs of sequntial nodes."
-  [[cb tx-index nodes cause :as acc] value]
-  (println "reducer-value->node")
-  (let [[tx-index node] (new-node cb tx-index cause value)
-        next-cause (first node)]
-    [cb tx-index (into nodes node) next-cause]))
-
-(defn reducer-edn-value->flat-value
-  "Flattens edn collections into uuid refs. Also potentially maps seqable
-  values into their parent CausalList."
-  [[cb tx-index flat-values uuid :as acc] value]
-  (println "reducer-edn-value->flat-value")
-  (if-let [causal (get-in cb [::collections uuid])]
-    ; This should only be true at the top level of a nested transaction value
-    (let [is-in-list? (instance? CausalList causal)
-          is-in-map? (instance? CausalMap causal)
-          [cb tx-index flat-value] [cb tx-index "TODO"]]
-          ; (cond
-          ;   (map? value) (if is-in-map?)
-          ;   (seqable? value) (if is-in-list?)
-          ;   :else value)]
-      [cb tx-index (into flat-values flat-value) uuid])
-    ; Otherwise we're deeper in a nested value and we need to create new
-    ; causal collections and accoc them to the cb whenever we see them
-    (let [[cb uuid] (add-collection-of-this-values-type-to-cb cb value)]
-      (recur [cb tx-index flat-values uuid] value))))
+(defn merge-value-into-parent-collection?
+  [cb uuid cause value]
+  (let [causal (get-in cb [::collections uuid])]
+    (cond
+      (and (not cause) (map? value) (instance? CausalMap causal)) true
+      (and (not (map? value)) (seqable? value) (instance? CausalList causal)) true
+      :else false)))
 
 (defn handle-tx-value [cb [uuid cause value :as tx] tx-index]
   (println "handle-tx-value")
-  (let [[cb tx-index flat-values uuid] (reduce reducer-edn-value->flat-value [cb tx-index [] uuid] value)
-        [cb tx-index nodes] (reduce reducer-value->node [cb tx-index [] cause] flat-values)
-        cb (insert cb uuid nodes)]
-    [cb tx-index])) ; QUESTION: uuid ])) ;; Should this also return uuid?
+  (let [causal (get-in cb [::collections uuid])]
+    (if (merge-value-into-parent-collection? cb uuid cause value)
+      (let [[cb tx-index nodes] (value->nodes cb tx-index cause value)
+            cb (insert cb uuid nodes)]
+        [cb tx-index])
+      (let [[cb tx-index flat-value] (flatten-value cb tx-index value :preserve-strings? (instance? CausalMap causal))
+            [tx-index node] (new-node cb tx-index cause flat-value)
+            cb (insert cb uuid [node])]
+        [cb tx-index]))))
 
-; (defn handle-tx-value [cb [uuid cause value :as tx] tx-index]
-;   (println "TODO: value")
-;   (cond
-;     (map? value) (handle-tx-map-value cb tx tx-index)
-;     (seqable? value) (handle-tx-list-value cb tx tx-index)
-;     :else (let [[tx-index n] (new-node cb tx-index cause value)]
-;             [(insert cb uuid [n]) tx-index])))
-
-(defn handle-tx-potential-root ; ✅
+(defn handle-tx-potential-root
   "A tx without a `uuid` will create a new root collection."
   [cb [uuid cause value :as tx]]
   (println "handle-tx-potential-root")
@@ -212,7 +178,7 @@
     [cb uuid]
     (add-collection-of-this-values-type-to-cb cb value :is-root? true)))
 
-(defn validate-tx [cb [uuid cause value :as tx]] ; ✅
+(defn validate-tx [cb [uuid cause value :as tx]]
   (println "validate-tx")
   (let [causal (get-in cb [::collections uuid])]
     (when (and uuid (not (::root-uuid cb)))
@@ -225,7 +191,7 @@
       (throw (ex-info "Root node must satisfy the coll? predicate"
                       {:value value})))))
 
-(defn handle-tx ; ✅
+(defn handle-tx
   "Performs one tx in a transaction. `value`s with EDN collections will be converted to causal
   collections. Nested collections will be flattened into the collections map
   and refferenced by their uuid."
@@ -235,21 +201,74 @@
         [cb uuid] (handle-tx-potential-root cb tx)
         [cb tx-index] (handle-tx-value cb [uuid cause value] tx-index)]
     [cb tx-index]))
-; STEPS to handle a tx
-; recur down to the leaf of a value
-;   do NOT map out, serialize this so [cb and tx-index] are chained
-;
-; create the needed causal collection
-; get its uuid and assoc it into the cb
-; insert the value into the cb
-; return the [cb tx-index this-uuid] to the parent
-;  in the parent, chain [cb tx-index] into next children,
-;  but swap out the original collection for a (ref child-uuid)
-;  E.g. reduce on the cb and tx-index, but map the (ref child-uuid)...
-; in the parent, once all the children are handled
-;   insert these values
-;   and return [cb tx-index this-uuid]
-;
+
+(defn transact
+  "Automatically manages lamport-ts and tx-index when transacting into
+  multiple collections in a causal-base. The monotonic increasing of
+  tx-index will correspond to the order of `txs` and the values in them.
+  Transforms EDN values to their corresponding causal collections."
+  [cb txs]
+  (println "transact")
+  (loop [cb cb
+         [tx & txs] txs
+         tx-index 0]
+    (if tx
+      (let [[cb tx-index] (handle-tx cb tx tx-index)]
+        (recur cb txs tx-index))
+      (update cb ::s/lamport-ts inc))))
+; TODO: retract whole collections
+; TODO: retract contiguous chunks from [uuid1, id1] -> [uuid2, id2]
+; TODO: normalize transaction / abort if can't normalize
+;   Normalization is probably a fn or schema that gets passed to transact
+
+(defn gen-hide-txs-for-range
+  "Expects a causal-base structured like a tree and trys to walk it
+  from the start-id to the end-id to generate a list of hide txs"
+  [cb [start-uuid start-id] [end-uuid end-id]]
+  (println "TODO: txs"))
+
+; (defn reset [cb site-id lamport-ts] (println "TODO"))
+; (defn history [cb & site-id] (println "TODO"))
+; (defn undo [cb & site-id] (println "TODO"))
+; (defn redo [cb & site-id] (println "TODO"))
+; (defn log [cb & site-id] (println "TODO"))
+
+(comment
+  (name (keyword "cause.ref" (u/new-uid)))
+  (namespace (keyword "cause.ref" (u/new-uid)))
+
+  (u/insert
+   [[[1 "a" 0] 123]
+    [[1 "a" 1] 123]
+    [[1 "b" 0] 123]
+    [[1 "b" 1] 123]]
+   [[2 "a" 1] 123])
+
+  (def cb (new-causal-base))
+  (transact cb [[nil s/root-id [1 2 3 {:a 1}]]])
+  (transact cb [[nil nil [1 2 3 {:a 1}]]])
+  (transact cb [[nil nil {:a 1 :b {:c :d}}]])
+  (transact cb [[nil nil [:div "hey"
+                          [:p "these chars should be in the same list as :p"]]]])
+
+  (def acbm (atom (new-causal-base)))
+  (swap! acbm transact [[nil nil {:a 1 :b {:c :d}}]])
+  (transact @acbm [[(::root-uuid @acbm) :a 3]])
+  (transact @acbm [[(::root-uuid @acbm) :a "weee"]])
+  (transact @acbm [[(::root-uuid @acbm) :a {:ee 3 :ff [1 2 3]}]])
+
+  (def acbl (atom (new-causal-base)))
+  (swap! acbl transact [[nil nil [1 2 3]]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id 4]
+                   [(::root-uuid @acbl) s/root-id 5]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id "hey"]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id ["hey"]]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id [["hey"]]]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id ["hey" "sup"]]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id [[:div "hey"]]]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id [-3 -2 -1 0]]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]]))
+
 ; GOTCHAS
 ; If the parent uuid already exists and is a causal list, and the value is
 ; a seqable, then the value will be spread into the parent rather than
@@ -307,52 +326,3 @@
 ;   4. We can see how it goes. If there is a strong case for temp-ids this
 ;      could be split split apart before 1.0. After that I'd like to avoid
 ;      breaking releases for a long time.
-
-(defn transact ; ✅
-  "Automatically manages lamport-ts and tx-index when transacting into
-  multiple collections in a causal-base. The monotonic increasing of
-  tx-index will correspond to the order of `txs` and the values in them.
-  Transforms EDN values to their corresponding causal collections."
-  [cb txs]
-  (println "transact")
-  (loop [cb cb
-         [tx & txs] txs
-         tx-index 0]
-    (if tx
-      (let [[cb tx-index] (handle-tx cb tx tx-index)]
-        (recur cb (rest txs) tx-index))
-      (update cb ::s/lamport-ts inc))))
-; TODO: add new collections: lists, maps
-; TODO: add contiguous sequences: "y" "o" "l" "o"
-;         should be O(n + m)
-; TODO: covert nested collections to refs
-; TODO: retract whole collections
-; TODO: retract contiguous chunks from [uuid1, id1] -> [uuid2, id2]
-; TODO: normalize transaction / abort if can't normalize
-
-(defn gen-hide-txs-for-range
-  "Expects a causal-base structured like a tree and trys to walk it
-  from the start-id to the end-id to generate a list of hide txs"
-  [cb [start-uuid start-id] [end-uuid end-id]]
-  (println "TODO: txs"))
-
-; (defn reset [cb site-id lamport-ts] (println "TODO"))
-; (defn history [cb & site-id] (println "TODO"))
-; (defn undo [cb & site-id] (println "TODO"))
-; (defn redo [cb & site-id] (println "TODO"))
-; (defn log [cb & site-id] (println "TODO"))
-
-(comment
-  (name (keyword "cause.ref" (u/new-uid)))
-  (namespace (keyword "cause.ref" (u/new-uid)))
-
-  (u/insert
-   [[[1 "a" 0] 123]
-    [[1 "a" 1] 123]
-    [[1 "b" 0] 123]
-    [[1 "b" 1] 123]]
-   [[2 "a" 1] 123])
-
-  (def cb (new-causal-base))
-  (transact cb [[nil nil [1 2 3 {:a 1}]]])
-  (transact cb [["123" [0 "a" 0] [1 2 3]]]))
