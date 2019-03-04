@@ -279,7 +279,7 @@
   "Takes a value. If it's a causal tree it returns the data representing the
   current state of the tree. If it's not a causal tree it just returns the value."
   ([causal]
-   (causal->edn causal {:deref-atoms true}))
+   (causal->edn causal {:deref-atoms true})) ; TODO: add option to concat adjacent strings
   ([causal opts]
    (if (satisfies? proto/CausalTo causal)
      (proto/causal->edn causal opts)

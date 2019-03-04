@@ -3,6 +3,7 @@
             [cause.util :as u :refer [<<]]
             [cause.shared :as s]
             [cause.core :as c]
+            [cause.protocols :as proto]
             #? (:cljs [cause.list :refer [CausalList]])
             #? (:cljs [cause.map :refer [CausalMap]]))
   #? (:clj (:import (cause.list CausalList) (cause.map CausalMap))))
@@ -38,8 +39,8 @@
 (defn causal->ref [causal]
   (uuid->ref (c/get-uuid causal)))
 
-(defn ref? [kw]
-  (and (keyword? kw) (= ref-ns (namespace kw))))
+(defn ref? [v]
+  (and (keyword? v) (= ref-ns (namespace v))))
 
 (defn ref->uuid [ref]
   (name ref))
@@ -47,8 +48,24 @@
 (defn follow-ref [cb ref]
   (get-in cb [::collections (ref->uuid ref)]))
 
-(defn cb->edn [cb]
-  (println "TODO: edn"))
+(extend-type clojure.lang.Keyword
+  proto/CausalTo
+  (causal->edn [this {:keys [cb] :as opts}]
+    (if (and cb (ref? this))
+      (s/causal->edn (follow-ref cb this) opts) ; TODO: HANDLE: this could cause infinite recursion if two trees reference each other. Break out out after visiting each ref once, or throw if that happens
+      this)))
+
+(defn cb->edn
+  ([cb] (cb->edn cb (::root-uuid cb)))
+  ([cb uuid]
+   (let [causal (get-in cb [::collections uuid])]
+     (c/causal->edn causal {:cb cb}))))
+(comment
+  (cb->edn
+   (transact
+    (new-causal-base)
+    [[nil nil [:div {:foo "bar"} "wat"
+               [:p "baz"]]]])))
 
 (defn new-node
   "Returns a new local node and an incremented tx-index `[tx-index node]`"
@@ -228,16 +245,6 @@
 ; (defn log [cb & site-id] (println "TODO"))
 
 (comment
-  (name (keyword "cause.ref" (u/new-uid)))
-  (namespace (keyword "cause.ref" (u/new-uid)))
-
-  (u/insert
-   [[[1 "a" 0] 123]
-    [[1 "a" 1] 123]
-    [[1 "b" 0] 123]
-    [[1 "b" 1] 123]]
-   [[2 "a" 1] 123])
-
   (def cb (new-causal-base))
   (transact cb [[nil s/root-id [1 2 3 {:a 1}]]])
   (transact cb [[nil nil [1 2 3 {:a 1}]]])
@@ -264,7 +271,7 @@
   (transact @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]])
   ;
   (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]]))
+  (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]])) ; TODO: add a 4th raw-value? slot to tx
 
 ; GOTCHAS
 ; If the parent uuid already exists and is a causal list, and the value is
