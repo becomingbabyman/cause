@@ -53,7 +53,6 @@
 (defn new-node
   "Returns a new local node and an incremented tx-index `[tx-index node]`"
   [cb tx-index cause value]
-  (println "new-node")
   [(inc tx-index)
    (s/new-node (::s/lamport-ts cb) (::s/site-id cb) (or tx-index 0)
                cause value)])
@@ -63,14 +62,12 @@
   updates the history of the containing `cb`. List nodes must be
   sequential. Returns a cb"
   [cb uuid nodes]
-  (println "insert")
   (let [reverse-paths (map #(do [(first %) uuid]) nodes)]
     (-> cb
         (update-in [::collections uuid] #(c/insert % (first nodes) (rest nodes)))
         (update ::history u/insert (first reverse-paths) {:next-vals (next reverse-paths)}))))
 
 (defn add-collection-of-this-values-type-to-cb [cb value & {:keys [is-root?]}]
-  (println "add-collection-of-this-values-type-to-cb")
   (if-let [causal (cond
                     (map? value) (c/new-causal-map)
                     (seqable? value) (c/new-causal-list)
@@ -100,17 +97,21 @@
   ([cb tx-index list-value]
    (list->nodes cb tx-index list-value nil))
   ([cb tx-index list-value cause]
-   (reduce (fn [[cb tx-index nodes cause] v]
-             (if (string? v)
-               (let [[cb tx-index more-nodes next-cause] (list->nodes cb tx-index v cause)]
-                 [cb tx-index (into nodes more-nodes) next-cause])
-               (let [[cb tx-index flat-v] (flatten-value cb tx-index v)
-                     [tx-index node] (new-node cb tx-index cause flat-v)]
-                 [cb tx-index (conj nodes node) (first node)])))
-           [cb tx-index [] (or cause s/root-id)]
-           list-value)))
+   (let [is-string? (string? list-value)
+         value (if is-string? (u/char-seq list-value) list-value)]
+     (reduce (fn [[cb tx-index nodes cause] v]
+               (if (and (not is-string?) (string? v))
+                 (let [[cb tx-index more-nodes next-cause] (list->nodes cb tx-index v cause)]
+                   [cb tx-index (into nodes more-nodes) next-cause])
+                 (let [[cb tx-index flat-v] (flatten-value cb tx-index v :preserve-strings? is-string?)
+                       [tx-index node] (new-node cb tx-index cause flat-v)]
+                   [cb tx-index (conj nodes node) (first node)])))
+             [cb tx-index [] (or cause s/root-id)]
+             value))))
 (comment
-  (list->nodes (new-causal-base) 0 [1 2 3]))
+  (list->nodes (new-causal-base) 0 [1 2 3])
+  (list->nodes (new-causal-base) 0 "abc")
+  (list->nodes (new-causal-base) 0 "🤟🏿wat"))
 
 (defn flatten-collection
   [cb tx-index value node-fn]
@@ -122,7 +123,6 @@
 
 (defn flatten-value
   [cb tx-index value & {:keys [preserve-strings?]}]
-  (println "flatten-value")
   (cond
     (and preserve-strings? (string? value)) [cb tx-index value]
     (map? value) (flatten-collection cb tx-index value map->nodes)
@@ -142,7 +142,6 @@
 (defn value->nodes
   "Returns `[cb tx-index nodes]`"
   [cb tx-index cause value]
-  (println "value->nodes")
   (cond
     ; (and preserve-strings? (string? value)) [cb tx-index value]
     (map? value) (map->nodes cb tx-index value)
@@ -159,7 +158,6 @@
       :else false)))
 
 (defn handle-tx-value [cb [uuid cause value :as tx] tx-index]
-  (println "handle-tx-value")
   (let [causal (get-in cb [::collections uuid])]
     (if (merge-value-into-parent-collection? cb uuid cause value)
       (let [[cb tx-index nodes] (value->nodes cb tx-index cause value)
@@ -173,13 +171,11 @@
 (defn handle-tx-potential-root
   "A tx without a `uuid` will create a new root collection."
   [cb [uuid cause value :as tx]]
-  (println "handle-tx-potential-root")
   (if uuid
     [cb uuid]
     (add-collection-of-this-values-type-to-cb cb value :is-root? true)))
 
 (defn validate-tx [cb [uuid cause value :as tx]]
-  (println "validate-tx")
   (let [causal (get-in cb [::collections uuid])]
     (when (and uuid (not (::root-uuid cb)))
       (throw (ex-info "Please transact a root collection first by setting uuid and cause to nil"
@@ -196,7 +192,6 @@
   collections. Nested collections will be flattened into the collections map
   and refferenced by their uuid."
   [cb [uuid cause value :as tx] tx-index]
-  (println "handle-tx")
   (let [_ (validate-tx cb tx)
         [cb uuid] (handle-tx-potential-root cb tx)
         [cb tx-index] (handle-tx-value cb [uuid cause value] tx-index)]
@@ -208,7 +203,6 @@
   tx-index will correspond to the order of `txs` and the values in them.
   Transforms EDN values to their corresponding causal collections."
   [cb txs]
-  (println "transact")
   (loop [cb cb
          [tx & txs] txs
          tx-index 0]
@@ -267,7 +261,10 @@
   (transact @acbl [[(::root-uuid @acbl) s/root-id ["hey" "sup"]]])
   (transact @acbl [[(::root-uuid @acbl) s/root-id [[:div "hey"]]]])
   (transact @acbl [[(::root-uuid @acbl) s/root-id [-3 -2 -1 0]]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]]))
+  (transact @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]])
+  ;
+  (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
+  (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]]))
 
 ; GOTCHAS
 ; If the parent uuid already exists and is a causal list, and the value is

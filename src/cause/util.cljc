@@ -55,3 +55,25 @@
      (alter-meta! #'~symbol #(assoc % :doc (:doc m#)
                                     :arglists (:arglists m#)))
      #'~symbol))
+
+; https://lambdaisland.com/blog/2017-06-12-clojure-gotchas-surrogate-pairs
+(defn char-code-at [str pos]
+  #? (:clj (.charAt str pos)
+           :cljs (.charCodeAt str pos)))
+(defn char-seq
+  "Return a seq of the characters in a string, making sure not to split up
+  UCS-2 (or is it UTF-16?) surrogate pairs. Because JavaScript. And Java."
+  ([str]
+   (char-seq str 0))
+  ([str offset]
+   (if (>= offset (count str))
+     ()
+     (let [code (char-code-at str offset)
+           width (if (<= 0xD800 (int code) 0xDBFF) 2 1)] ; detect "high surrogate"
+       (cons (subs str offset (+ offset width))
+             (char-seq str (+ offset width)))))))
+
+(comment
+  (char-seq "🤟")
+  (char-seq "🤟🏿") ; TODO: 🤟🏿 should actually have a width of 4 and be parsed as 1 char
+  (char-seq "🤟🏿wat"))
