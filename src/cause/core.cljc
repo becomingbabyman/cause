@@ -20,11 +20,9 @@
 (def ^{:doc "An alias for hide."} delete ::s/hide)
 (def ^{:doc "If a cause is hidden, insert this value to show
             it again."} show ::s/show)
-
-; Special nodes
-(def ^{:doc "The first node in every causal-list. To insert
-             a node at the front set root-node as the cause."}
-  root-node s/root-node)
+(def ^{:doc "The id of the first node in every causal-list. To insert
+             a node at the front set root-id as the cause."}
+  root-id s/root-id)
 
 ; Causal collection types are convergent and EDN-like.
 (redef new-causal-list c-list/new-causal-list)

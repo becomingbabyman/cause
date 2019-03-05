@@ -115,7 +115,8 @@
    (list->nodes cb tx-index list-value nil))
   ([cb tx-index list-value cause]
    (let [is-string? (string? list-value)
-         value (if is-string? (u/char-seq list-value) list-value)]
+         ; value (if is-string? (u/char-seq list-value) list-value) ; TODO: OPTIMIZE: u/char-seq breaks on large strings and does not group 4 byte unicode chars like "🤟🏿"
+         value (if is-string? (seq list-value) list-value)]
      (reduce (fn [[cb tx-index nodes cause] v]
                (if (and (not is-string?) (string? v))
                  (let [[cb tx-index more-nodes next-cause] (list->nodes cb tx-index v cause)]
@@ -272,61 +273,3 @@
   ;
   (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
   (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]])) ; TODO: add a 4th raw-value? slot to tx
-
-; GOTCHAS
-; If the parent uuid already exists and is a causal list, and the value is
-; a seqable, then the value will be spread into the parent rather than
-; creating another causal lists.
-;   E.g. ["a" "b" "c"] becomes "a" "b" "c" spliced into the partent list
-; To avoid that double wrap the top value,
-;   E.g. [["a" "b" "c"]] becomes ["a" "b" "c"] a nested list in the parent list
-; ...
-; is there a uuid
-; does that collection exist
-;   if not throw error
-; what type of value is it?
-;   maps should be inserted as new nested causal maps at their cause
-;   if a vector
-; ...
-; ...
-(comment
-  (transact cb [[:uuid :cause [:doc {:thing "xyz"} "abc"
-                               [:image {:url "this string should NOT be split"}]
-                               [:paragraph "these chars should be split and inserted in
-                                           the same vec as the `:paragraph` keyword"]]]
-                [:uuid-of-doc-map nil {:thing "I'm different" :new-thing "I'm new"}] ; NOTE: a nil cause inside a map uuid will merge the value map with the containing map rather than insert a new map
-                [:uuid-of-doc-map :thing {:thing "I'm different" :new-thing "I'm new"}] ; Alternatively this would create a nested map {:thing {:thing "I'm different" :new-thing "I'm new"}}
-                [:uuid-of-paragraph :id-of-s-in-chars ::s/hide] ; NOTE: grabbing uuids and ids of nodes that are part of the same tx (have not been inserted yet) will not be possible. This is only an illustration of the types operations that a tx might enable
-                [:uuid-of-paragraph :id-of-r-in-chars "acters"] ; `a` will be caused by the cause in this tx. `c` will be caused by `a`, and so on...
-                [:uuid-of-paragraph :id-of-r-in-chars "acters" {:value true}] ; E.g insert `acters` without splitting it. QUESTION: what if an optional options map let you disable "smart" value transformation?
-                [:uuid-of-paragraph :id-of-r-in-chars "acters" true] ; Or even, if {:value true} is the only option that needs to be supported
-                [:uuid-of-paragraph :id-of-last-node [" " [:link {:url "http..."} "a link"]]] ; This is kind of clear... The top vec should be flattened into the parent list
-                [:uuid-of-paragraph :id-of-last-node [:link {:url "http..."} "a link"]] ; This is less clear. The intention is probably to insert a new list, but it will get flattened given the default rules...
-                [:uuid-of-paragraph :id-of-last-node [[:link {:url "http..."} "a link"]]]])) ; QUESTION: Sould the child need to know the type of its parent and "double wrap" itself accordingly?
-                ; ->                                                                             Probably...
-                ; this flattening of a string value is because the parent (uuid) collection is a list
-                ; if the parent was a map the string would not get flattened...
-                ; QUESTION: what if an API consumer wants to transact a string into a list without splitting / flattening it?
-                ;   This makes me thing this transform should happen outside the transact fn. See comment below
-; TODO: should converting EDN to something transactable be done in
-;  the `transact` function or should it be done in a helper function
-;  called by the user?
-;  NOTE: if we did this and wanted to allow chaining of ids that don't exist yet or nesting
-;    we'd need to add support for temporary ids... so you could say something is caused by a
-;    value in the same tx.
-;    This is probably more flexibile / general purpose, but also adds to the overhead of the transact fn
-;    since now it needs to manage the state of multiple txs inorder to optimize weave performance of sequences.
-;    Before we could rely on the user grouping sequence inserts together, but not that relationship is abstracted
-;    into general purpose temp ids that may or may not be contiguous sequences...
-; CONCULSION:
-;   I'm inclined to keep the transact fn "smart".
-;   1. It's easier to implement than adding temp-id support w/ optimizations
-;      and helper fns to handle transforming EDN to a valid tx with temp-ids.
-;   2. For better or worse it reduces the surface area of the user facing
-;      write API to the `transact` fn with 3, maybe 4 tuples per tx. Pretty small.
-;   3. Adding an optional 4th slot in the tx tuple allows users to specify their
-;      desired behavior between "smart" vs treating values as themselves, thus
-;      preserving the ability to transact raw values of any type.
-;   4. We can see how it goes. If there is a strong case for temp-ids this
-;      could be split split apart before 1.0. After that I'd like to avoid
-;      breaking releases for a long time.
