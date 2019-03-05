@@ -6,7 +6,7 @@
             [cause.protocols :as proto]
             #? (:cljs [cause.list :refer [CausalList]])
             #? (:cljs [cause.map :refer [CausalMap]]))
-  #? (:clj (:import (cause.list CausalList) (cause.map CausalMap))))
+  #? (:clj (:import (clojure.lang Keyword) (cause.list CausalList) (cause.map CausalMap))))
 
 (spec/def ::reverse-path (spec/tuple ::s/id ::s/uuid)) ; Starts with id to make sorting easier
 (spec/def ::history (spec/coll-of ::reverse-path ::gen-max 3)) ; Sorted log of all insertions
@@ -48,7 +48,7 @@
 (defn follow-ref [cb ref]
   (get-in cb [::collections (ref->uuid ref)]))
 
-(extend-type clojure.lang.Keyword
+(extend-type Keyword
   proto/CausalTo
   (causal->edn [this {:keys [cb] :as opts}]
     (if (and cb (ref? this))
