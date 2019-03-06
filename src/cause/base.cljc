@@ -2,8 +2,9 @@
   (:require [clojure.spec.alpha :as spec]
             [cause.util :as u :refer [<<]]
             [cause.shared :as s]
-            [cause.core :as c]
             [cause.protocols :as proto]
+            [cause.list :as c-list]
+            [cause.map :as c-map]
             #? (:cljs [cause.list :refer [CausalList]])
             #? (:cljs [cause.map :refer [CausalMap]]))
   #? (:clj (:import (clojure.lang Keyword) (cause.list CausalList) (cause.map CausalMap))))
@@ -37,7 +38,7 @@
   (keyword ref-ns uuid))
 
 (defn causal->ref [causal]
-  (uuid->ref (c/get-uuid causal)))
+  (uuid->ref (proto/get-uuid causal)))
 
 (defn ref? [v]
   (and (keyword? v) (= ref-ns (namespace v))))
@@ -55,11 +56,9 @@
       (s/causal->edn (follow-ref cb this) opts) ; TODO: HANDLE: this could cause infinite recursion if two trees reference each other. Break out out after visiting each ref once, or throw if that happens
       this)))
 
-(defn cb->edn
-  ([cb] (cb->edn cb (::root-uuid cb)))
-  ([cb uuid]
-   (let [causal (get-in cb [::collections uuid])]
-     (c/causal->edn causal {:cb cb}))))
+(defn cb->edn [cb]
+  (let [causal (get-in cb [::collections (::root-uuid cb)])]
+    (s/causal->edn causal {:cb cb})))
 (comment
   (cb->edn
    (transact
@@ -81,15 +80,15 @@
   [cb uuid nodes]
   (let [reverse-paths (map #(do [(first %) uuid]) nodes)]
     (-> cb
-        (update-in [::collections uuid] #(c/insert % (first nodes) (rest nodes)))
+        (update-in [::collections uuid] #(proto/insert % (first nodes) (rest nodes)))
         (update ::history u/insert (first reverse-paths) {:next-vals (next reverse-paths)}))))
 
 (defn add-collection-of-this-values-type-to-cb [cb value & {:keys [is-root?]}]
   (if-let [causal (cond
-                    (map? value) (c/new-causal-map)
-                    (seqable? value) (c/new-causal-list)
+                    (map? value) (c-map/new-causal-map)
+                    (seqable? value) (c-list/new-causal-list)
                     :else nil)]
-    (let [uuid (c/get-uuid causal)
+    (let [uuid (proto/get-uuid causal)
           cb (assoc-in cb [::collections uuid] causal)
           cb (if is-root? (assoc cb ::root-uuid uuid) cb)]
       [cb uuid])

@@ -39,24 +39,3 @@
 (redef get-weave proto/get-weave)
 
 (redef causal->edn s/causal->edn)
-
-; TODO: DEPRECATE: encourage the use of causal-base instead
-(defn edn->causal
-  "Takes an EDN value and returns a Causal value. EDN collections become
-  Causal collections. Strings will stay whole when used as values in maps, but
-  will automatically split into character sequences when inside a vector or a
-  list, since strings are ordered character lists."
-  ; TODO: perform this operation in one transaction once transact fn is added
-  ; TODO: provide an option to turn scalars into ropes when CausalRope is added
-  [edn & {:keys [in]}]
-  (cond
-    (and (= in :map) (string? edn)) edn
-    (and (= in :list) (string? edn)) edn
-    (map? edn) (reduce-kv #(assoc %1 %2 (edn->causal %3 :in :map)) (new-causal-map) edn)
-    (seqable? edn) (->> edn
-                        (reduce #(if (string? %2) (apply conj %1 (seq %2)) (conj %1 %2)) [])
-                        (reduce #(conj %1 (edn->causal %2 :in :list)) (new-causal-list)))
-    :else edn)) ; keywords, ints, ratios and all other values are returned intact
-
-; (defn undo [causal-tree & site-id] (println "TODO"))
-; (defn redo [causal-tree & site-id] (println "TODO"))

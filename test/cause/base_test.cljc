@@ -26,5 +26,14 @@
       (is (= [\h \i 1 2] (b/cb->edn (b/transact cb [[(::b/root-uuid cb) c/root-id ["hi"]]]))))
       (is (= [[\h \i] 1 2] (b/cb->edn (b/transact cb [[(::b/root-uuid cb) c/root-id [["hi"]]]])))))))
 
+(deftest test-cb->edn
+  (is (= '(:div {:foo "bar"} \w \a \t (:p \b \a \z))
+         (b/cb->edn
+          (b/transact
+           (b/new-causal-base)
+           [[nil nil [:div {:foo "bar"} "wat"
+                      [:p "baz"]]]])))))
+
 (comment
-  (test-transact))
+  (test-transact)
+  (test-cb->edn))
