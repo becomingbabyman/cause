@@ -190,10 +190,12 @@
 #? (:cljs (cljs.reader/register-tag-parser! 'causal/list read-edn-map))
 
 (extend-type CausalList
-  proto/CausalTree
+  proto/CausalMeta
   (get-uuid [this] (::s/uuid (.-ct this)))
   (get-ts [this] (::s/lamport-ts (.-ct this)))
   (get-site-id [this] (::s/site-id (.-ct this)))
+
+  proto/CausalTree
   (get-weave [this] (::s/weave (.-ct this)))
   (insert
     ([this node]
@@ -208,8 +210,9 @@
     (CausalList. (s/merge-trees weave (.-ct causal-list1) (.-ct causal-list2))))
 
   proto/CausalTo
-  (causal->edn [causal opts]
-    (causal-list->edn (.-ct causal) opts)))
+  (causal->edn
+    ([this] (proto/causal->edn this {}))
+    ([causal opts] (causal-list->edn (.-ct causal) opts))))
 
 (defn new-causal-list
   "Creates a new causal list containing the items."

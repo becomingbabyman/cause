@@ -224,10 +224,12 @@
 #? (:cljs (cljs.reader/register-tag-parser! 'causal/map read-edn-map))
 
 (extend-type CausalMap
-  proto/CausalTree
+  proto/CausalMeta
   (get-uuid [this] (::s/uuid (.-ct this)))
   (get-ts [this] (::s/lamport-ts (.-ct this)))
   (get-site-id [this] (::s/site-id (.-ct this)))
+
+  proto/CausalTree
   (get-weave [this] (::s/weave (.-ct this)))
   (insert
     ([this node]
@@ -242,8 +244,9 @@
     (CausalMap. (s/merge-trees weave (.-ct causal-map1) (.-ct causal-map2))))
 
   proto/CausalTo
-  (causal->edn [causal opts]
-    (causal-map->edn (.-ct causal) opts)))
+  (causal->edn
+    ([this] (proto/causal->edn this {}))
+    ([causal opts] (causal-map->edn (.-ct causal) opts))))
 
 (defn new-causal-map
   "Creates a new causal map containing the alternating keys and values."

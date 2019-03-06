@@ -270,10 +270,12 @@
 
 (extend-type Atom
   proto/CausalTo
-  (causal->edn [this opts]
-    (if (:deref-atoms opts)
-      (causal->edn (deref this) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
-      this)))
+  (causal->edn
+    ([this] (proto/causal->edn this {}))
+    ([this opts]
+     (if (:deref-atoms opts)
+       (causal->edn (deref this) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
+       this))))
 
 (defn causal->edn
   "Takes a value. If it's a causal tree it returns the data representing the

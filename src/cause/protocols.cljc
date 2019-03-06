@@ -1,13 +1,16 @@
 (ns cause.protocols)
 
-(defprotocol CausalTree
-  "The CvRDT related functions that a causal collection type must implement."
+(defprotocol CausalMeta
+  "Convenience access to the meta data in a causal data type."
   (get-uuid [causal]
     "The UUID of the causal collection.")
   (get-ts [causal]
     "The current lamport timestamp of the causal collection.")
   (get-site-id [causal]
-    "The site identifer of this machine in this collection.")
+    "The site identifer of this machine in this collection."))
+
+(defprotocol CausalTree
+  "The CvRDT related functions that a causal tree type must implement."
   (get-weave [causal]
     "The woven cache of nodes.")
   ; (get-nodes [causal])
@@ -27,7 +30,13 @@
     timestamps) should be the only differences between them."))
 
 (defprotocol CausalTo
-  (causal->edn [causal opts]
+  (causal->edn [causal] [causal opts]
     "Convert a causal collection into a traditional edn collection.
     It will automatically deref atom values unless you pass the opt
     `:deref-atoms false`"))
+
+(defprotocol CausalBase
+  (transact [causal-base txs]
+    "Apply one or many \"changes\" at the current logical time.")
+  (follow-ref [causal-base ref]
+    "Returns the causal collection referenced by the ref."))

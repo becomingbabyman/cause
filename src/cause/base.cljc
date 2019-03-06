@@ -7,7 +7,12 @@
             [cause.map :as c-map]
             #? (:cljs [cause.list :refer [CausalList]])
             #? (:cljs [cause.map :refer [CausalMap]]))
-  #? (:clj (:import (clojure.lang Keyword) (cause.list CausalList) (cause.map CausalMap))))
+  #? (:clj (:import (cause.list CausalList)
+                    (cause.map CausalMap)
+                    (clojure.lang Keyword IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
+                    (java.io Writer)
+                    (java.util Date Collection)
+                    (java.lang Object))))
 
 (spec/def ::reverse-path (spec/tuple ::s/id ::s/uuid)) ; Starts with id to make sorting easier
 (spec/def ::history (spec/coll-of ::reverse-path ::gen-max 3)) ; Sorted log of all insertions
@@ -24,7 +29,11 @@
 (spec/def ::tx (spec/tuple ::s/uuid ::s/cause ::s/value))
 (spec/def ::txs (spec/coll-of ::tx :gen-max 3))
 
-(defn new-causal-base []
+(defn new-cb
+  "Like a database, but comprised of nested causal collections. If you
+  want to nest causal collections and you want them to share history
+  use this."
+  []
   {::s/lamport-ts 0
    ::s/uuid (u/new-uid)
    ::s/site-id (s/new-site-id)
@@ -46,23 +55,31 @@
 (defn ref->uuid [ref]
   (name ref))
 
-(defn follow-ref [cb ref]
-  (get-in cb [::collections (ref->uuid ref)]))
+(defn get-causal
+  "If no uuid or ref specified return the root causal collection."
+  ([cb] (get-causal cb (::root-uuid cb)))
+  ([cb uuid-or-ref]
+   (when uuid-or-ref
+     (get-in cb [::collections (ref->uuid uuid-or-ref)]))))
 
 (extend-type Keyword
   proto/CausalTo
-  (causal->edn [this {:keys [cb] :as opts}]
-    (if (and cb (ref? this))
-      (s/causal->edn (follow-ref cb this) opts) ; TODO: HANDLE: this could cause infinite recursion if two trees reference each other. Break out out after visiting each ref once, or throw if that happens
-      this)))
+  (causal->edn
+    ([this] (proto/causal->edn this {}))
+    ([this {:keys [cb] :as opts}]
+     (if (and cb (ref? this))
+       (s/causal->edn (get-causal cb this) opts) ; TODO: HANDLE: this could cause infinite recursion if two trees reference each other. Break out out after visiting each ref once, or throw if that happens
+       this))))
 
-(defn cb->edn [cb]
-  (let [causal (get-in cb [::collections (::root-uuid cb)])]
-    (s/causal->edn causal {:cb cb})))
+(defn cb->edn
+  ([cb] (cb->edn cb {}))
+  ([cb opts]
+   (let [causal (get-causal cb)]
+     (s/causal->edn causal (merge opts {:cb cb})))))
 (comment
   (cb->edn
-   (transact
-    (new-causal-base)
+   (transact-
+    (new-cb)
     [[nil nil [:div {:foo "bar"} "wat"
                [:p "baz"]]]])))
 
@@ -106,7 +123,7 @@
              [cb tx-index []]
              map-value))
 (comment
-  (map->nodes (new-causal-base) 0 {:a 1 :b 2}))
+  (map->nodes (new-cb) 0 {:a 1 :b 2}))
 
 (defn list->nodes
   "Returns `[cb tx-index nodes last-node-id]`"
@@ -126,9 +143,9 @@
              [cb tx-index [] (or cause s/root-id)]
              value))))
 (comment
-  (list->nodes (new-causal-base) 0 [1 2 3])
-  (list->nodes (new-causal-base) 0 "abc")
-  (list->nodes (new-causal-base) 0 "🤟🏿wat"))
+  (list->nodes (new-cb) 0 [1 2 3])
+  (list->nodes (new-cb) 0 "abc")
+  (list->nodes (new-cb) 0 "🤟🏿wat"))
 
 (defn flatten-collection
   [cb tx-index value node-fn]
@@ -147,14 +164,14 @@
     :else [cb tx-index value]))
 (comment
   ; map
-  (flatten-value (new-causal-base) 0 {:a {:aa 1 :bb 2 :cc 3}})
-  (flatten-value (new-causal-base) 0 {:a {:b {:c :d}}})
+  (flatten-value (new-cb) 0 {:a {:aa 1 :bb 2 :cc 3}})
+  (flatten-value (new-cb) 0 {:a {:b {:c :d}}})
   ; list
-  (flatten-value (new-causal-base) 0 [1 [2 [3]]])
-  (flatten-value (new-causal-base) 0 [1 "hello" "world"])
+  (flatten-value (new-cb) 0 [1 [2 [3]]])
+  (flatten-value (new-cb) 0 [1 "hello" "world"])
   ; combo
-  (flatten-value (new-causal-base) 0 [:div {:title "don't break"}
-                                      [:span "break"]]))
+  (flatten-value (new-cb) 0 [:div {:title "don't break"}
+                             [:span "break"]]))
 
 (defn value->nodes
   "Returns `[cb tx-index nodes]`"
@@ -207,14 +224,14 @@
 (defn handle-tx
   "Performs one tx in a transaction. `value`s with EDN collections will be converted to causal
   collections. Nested collections will be flattened into the collections map
-  and refferenced by their uuid."
+  and referenced by their uuid."
   [cb [uuid cause value :as tx] tx-index]
   (let [_ (validate-tx cb tx)
         [cb uuid] (handle-tx-potential-root cb tx)
         [cb tx-index] (handle-tx-value cb [uuid cause value] tx-index)]
     [cb tx-index]))
 
-(defn transact
+(defn transact-
   "Automatically manages lamport-ts and tx-index when transacting into
   multiple collections in a causal-base. The monotonic increasing of
   tx-index will correspond to the order of `txs` and the values in them.
@@ -244,31 +261,92 @@
 ; (defn redo [cb & site-id] (println "TODO"))
 ; (defn log [cb & site-id] (println "TODO"))
 
+#? (:clj
+    (deftype CausalBase [cb]
+      Counted
+      (count [this] (clojure.core/count (get-causal (.cb this))))
+
+      Seqable
+      (seq [this] (clojure.core/seq (get-causal (.cb this)))))
+
+    :cljs
+    (deftype CausalBase [cb]
+      ICounted
+      (-count [this] (clojure.core/count (get-causal (.-cb this))))
+
+      IPrintWithWriter
+      (-pr-writer [o writer opts]
+        (-write writer (str "#causal/base " (pr-str (s/causal->edn o)))))
+
+      ISeqable
+      (-seq [this] (clojure.core/seq (get-causal (.-cb this))))))
+
+#? (:clj (defmethod print-method CausalBase [^CausalBase o ^java.io.Writer w]
+           (.write w (str "#causal/base " (pr-str (s/causal->edn o))))))
+
+(defn read-edn-map
+  [read-object]
+  (let [[cb] read-object]
+    (CausalBase. cb)))
+
+#? (:cljs (cljs.reader/register-tag-parser! 'cause.list read-edn-map))
+
+(extend-type CausalBase
+  proto/CausalBase
+  (transact [this txs] (CausalBase. (transact- (.-cb this) txs)))
+  (follow-ref [this ref] (get-causal (.-cb this) ref))
+
+  proto/CausalMeta
+  (get-uuid [this] (::s/uuid (.-cb this)))
+  (get-ts [this] (::s/lamport-ts (.-cb this)))
+  (get-site-id [this] (::s/site-id (.-cb this)))
+
+  proto/CausalTo
+  (causal->edn
+    ([this] (proto/causal->edn this {}))
+    ([this opts] (cb->edn (.-cb this) opts))))
+
+(defn new-causal-base
+  "Creates a new causal base."
+  []
+  (CausalBase. (new-cb)))
+
 (comment
-  (def cb (new-causal-base))
-  (transact cb [[nil s/root-id [1 2 3 {:a 1}]]])
-  (transact cb [[nil nil [1 2 3 {:a 1}]]])
-  (transact cb [[nil nil {:a 1 :b {:c :d}}]])
-  (transact cb [[nil nil [:div "hey"
-                          [:p "these chars should be in the same list as :p"]]]])
+  (def cb (new-cb))
+  (transact- cb [[nil s/root-id [1 2 3 {:a 1}]]])
+  (transact- cb [[nil nil [1 2 3 {:a 1}]]])
+  (transact- cb [[nil nil {:a 1 :b {:c :d}}]])
+  (transact- cb [[nil nil [:div "hey"
+                           [:p "these chars should be in the same list as :p"]]]])
 
-  (def acbm (atom (new-causal-base)))
+  (def acbm (atom (new-cb)))
   (swap! acbm transact [[nil nil {:a 1 :b {:c :d}}]])
-  (transact @acbm [[(::root-uuid @acbm) :a 3]])
-  (transact @acbm [[(::root-uuid @acbm) :a "weee"]])
-  (transact @acbm [[(::root-uuid @acbm) :a {:ee 3 :ff [1 2 3]}]])
+  (transact- @acbm [[(::root-uuid @acbm) :a 3]])
+  (transact- @acbm [[(::root-uuid @acbm) :a "weee"]])
+  (transact- @acbm [[(::root-uuid @acbm) :a {:ee 3 :ff [1 2 3]}]])
 
-  (def acbl (atom (new-causal-base)))
+  (def acbl (atom (new-cb)))
   (swap! acbl transact [[nil nil [1 2 3]]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id 4]
-                   [(::root-uuid @acbl) s/root-id 5]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id "hey"]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id ["hey"]]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id [["hey"]]]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id ["hey" "sup"]]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id [[:div "hey"]]]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id [-3 -2 -1 0]]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id 4]
+                    [(::root-uuid @acbl) s/root-id 5]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id "hey"]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id ["hey"]]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id [["hey"]]]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id ["hey" "sup"]]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id [[:div "hey"]]]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id [-3 -2 -1 0]]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]])
   ;
-  (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
-  (transact @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]])) ; TODO: add a 4th raw-value? slot to tx
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]]) ; TODO: add a 4th raw-value? slot to tx
+
+  (count (new-causal-base))
+  (seq (new-causal-base))
+  (proto/follow-ref (new-causal-base) nil)
+  (def cb (proto/transact (new-causal-base) [[nil nil [:div {:a 1} "foo" [:span "bar"]]]]))
+  (count cb)
+  (seq cb)
+  (seq (get-causal (.-cb cb) (peek (second (seq cb)))))
+  (seq (proto/follow-ref cb (peek (second (seq cb)))))
+  (seq cb :cause.base.ref/OysqODJodVrFe5l5rxNx9)
+  (proto/causal->edn (proto/transact (new-causal-base) [[nil nil [:div {:a 1} "foo" [:span "bar"]]]])))
