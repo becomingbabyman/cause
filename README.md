@@ -134,13 +134,13 @@ Causal collections will automatically track the order values are inserted into t
 - [x] 🥞 Add transaction support to the data model via `tx-index`
 - [x] ✅ Full test coverage for collection protocol implementations
 - [x] ƛ EDN -> Causal transformation function
-- [ ] 🥞 Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
-  - [ ] Transactions should also weave contiguous sequences in O(n+m) instead of the current O(n*m), where n is all woven nodes and m is nodes in the transaction.
+- [x] 🥞 Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
+  - [x] Transactions should also weave contiguous sequences in O(n+m) instead of the current O(n*m), where n is all woven nodes and m is nodes in the transaction.
 - [ ] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal tree data type.
-- [ ] ⫷ Nested collection helper functions
-  - [ ] Shared lamport-ts between collections
-  - [ ] Transacting across multiple collections
-  - [ ] History across multiple collections
+- [x] ⫷ Nested collection helper functions
+  - [x] Shared lamport-ts between collections
+  - [x] Transacting across multiple collections
+  - [x] History across multiple collections
 - [ ] 👋 Improved merge / sync functions. Particularly ways to conveniently sync E2E over a distributed p2p network. Add examples using common packages that support (WebSockets, WebWorkers and WebRTC). Helper functions to make the integration simpler.
   - [ ] Also make some decisions around chattiness and ideal distributed network topologies. Hopefully this can be in the form of a recommended library, but some of the decisions might be specific to distributing a causal tree across many clients
 - [ ] ✅ Generative property based E2E tests with nested collections that share history
