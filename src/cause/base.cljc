@@ -17,6 +17,7 @@
 (spec/def ::reverse-path (spec/tuple ::s/id ::s/uuid)) ; Starts with id to make sorting easier
 (spec/def ::history (spec/coll-of ::reverse-path ::gen-max 3)) ; Sorted log of all insertions
 (spec/def ::root-uuid ::s/uuid)
+; TODO: ::collections actually stores CausalTrees not ::s/causal-trees...
 (spec/def ::collections (spec/map-of ::s/uuid ::s/causal-tree :gen-max 3))
 (spec/def ::causal-base (spec/keys :req [::s/uuid
                                          ::s/lamport-ts
@@ -26,6 +27,8 @@
                                          ::collections]))
 
 ; TODO: add a 4th optional slot to the tx tuple for `::raw-value?`
+; TODO: should ::s/value be replaced with another type of "value" since it
+;   can be processed and broken into many sub ::s/values by the transact fn?
 (spec/def ::tx (spec/tuple ::s/uuid ::s/cause ::s/value))
 (spec/def ::txs (spec/coll-of ::tx :gen-max 3))
 
@@ -34,7 +37,7 @@
   want to nest causal collections and you want them to share history
   use this."
   []
-  {::s/lamport-ts 0
+  {::s/lamport-ts 1
    ::s/uuid (u/new-uid)
    ::s/site-id (s/new-site-id)
    ::history []
@@ -55,9 +58,9 @@
 (defn ref->uuid [ref]
   (name ref))
 
-(defn get-causal
-  "If no uuid or ref specified return the root causal collection."
-  ([cb] (get-causal cb (::root-uuid cb)))
+(defn get-collection-
+  "If no uuid or ref specified returns the root causal collection."
+  ([cb] (get-collection- cb (::root-uuid cb)))
   ([cb uuid-or-ref]
    (when uuid-or-ref
      (get-in cb [::collections (ref->uuid uuid-or-ref)]))))
@@ -68,13 +71,13 @@
     ([this] (proto/causal->edn this {}))
     ([this {:keys [cb] :as opts}]
      (if (and cb (ref? this))
-       (s/causal->edn (get-causal cb this) opts) ; TODO: HANDLE: this could cause infinite recursion if two trees reference each other. Break out out after visiting each ref once, or throw if that happens
+       (s/causal->edn (get-collection- cb this) opts) ; TODO: HANDLE: this could cause infinite recursion if two trees reference each other. Break out out after visiting each ref once, or throw if that happens
        this))))
 
 (defn cb->edn
   ([cb] (cb->edn cb {}))
   ([cb opts]
-   (let [causal (get-causal cb)]
+   (let [causal (get-collection- cb)]
      (s/causal->edn causal (merge opts {:cb cb})))))
 (comment
   (cb->edn
@@ -95,7 +98,7 @@
   updates the history of the containing `cb`. List nodes must be
   sequential. Returns a cb"
   [cb uuid nodes]
-  (let [reverse-paths (map #(do [(first %) uuid]) nodes)]
+  (let [reverse-paths (map (fn [[id]] [id uuid]) nodes)]
     (-> cb
         (update-in [::collections uuid] #(proto/insert % (first nodes) (rest nodes)))
         (update ::history u/insert (first reverse-paths) {:next-vals (next reverse-paths)}))))
@@ -249,37 +252,85 @@
 ; TODO: normalize transaction / abort if can't normalize
 ;   Normalization is probably a fn or schema that gets passed to transact
 
-(defn gen-hide-txs-for-range
-  "Expects a causal-base structured like a tree and trys to walk it
-  from the start-id to the end-id to generate a list of hide txs"
-  [cb [start-uuid start-id] [end-uuid end-id]]
-  (println "TODO: txs"))
+(defn seq-at-path-
+  [cb path]
+  (let [uuid (peek (pop path))
+        id (peek path)
+        coll-seq (seq (get-collection- cb uuid))
+        coll-seq (reduce (fn [a s]
+                           (if (= id (first s))
+                             (reduced a)
+                             (rest a)))
+                         coll-seq
+                         coll-seq)]
+    [coll-seq uuid id]))
+(comment
+  (def cb (transact- (new-cb) [[nil nil [:block "rand text"]]]))
+  (def coll (get-collection- cb))
+  (seq-at-path- cb [(proto/get-uuid coll) (first (nth (seq coll) 3))]))
 
-; (defn reset [cb site-id lamport-ts] (println "TODO"))
-; (defn history [cb & site-id] (println "TODO"))
-; (defn undo [cb & site-id] (println "TODO"))
-; (defn redo [cb & site-id] (println "TODO"))
-; (defn log [cb & site-id] (println "TODO"))
+(defn gen-hide-txs-for-range-
+  "Expects a causal-base structured like a tree and trys to walk it
+  from the start-path to the end-path to generate the minimal list of
+  hide txs. A path is a vector of one or more uuids starting with the
+  root-uuid and ending with the id of a node.
+  E.g. `[root-uuid uuid uuid id]` or `[root-uuid id]`.
+  Setting `:hiccup?` to true will treat the range as hiccup
+  and refrain from deleting the tag and optional attrs in the `end`
+  collection. E.g [:tag {:attrs 123} \"not protected\"]"
+  [cb start-path end-path & {:keys [hiccup?] :as opts}]
+  (loop [txs []
+         path start-path
+         [coll-seq uuid id] (seq-at-path- cb path)]
+    (if (not path) txs
+        (let [txs (conj txs [uuid id ::s/hide])]
+          (if (= path end-path) txs
+              (let [depth (- (count path) 2)
+                    path "TODO"]
+                    ;     path (cond
+                    ;            ())]
+                (recur txs path ["TODO" "TODO" "TODO"]))))))
+    ; if current-path equal to end-path return
+    ; else create hide tx for node at current-path
+    ;   and add it to txs
+    ;   then move current path forward
+    ;     is the next node a ref/uuid that's in the end-path?
+    ;     is it not?
+    ;     is this the end of a leaf and we need to step out a level?
+  (println "TODO: txs"))
+(comment
+  (do
+    (def cb (atom (new-causal-base)))
+    (swap! cb proto/transact [[nil nil [:block "rand text"
+                                        [:link {:url "site.xyz"} "a site"]
+                                        [:paragraph "paragraph text"]]]])
+    (proto/get-uuid @cb)
+    (proto/get-uuid (proto/get-collection @cb))
+    (def start (proto/get-collection @cb))
+    (def end (proto/get-collection @cb (last (last (seq start)))))
+    (proto/gen-hide-txs-for-range @cb
+                                  [(proto/get-uuid start)
+                                   (first (nth (seq start) 2))]
+                                  [(proto/get-uuid start)
+                                   (proto/get-uuid end)
+                                   (first (nth (seq end) 5))]
+                                  :hiccup? true))
+  (deref cb))
+
+; (defn reset- [cb site-id lamport-ts] (println "TODO"))
+; (defn get-history- [cb & site-id] (println "TODO"))
+; (defn undo- [cb & site-id] (println "TODO"))
+; (defn redo- [cb & site-id] (println "TODO"))
+; (defn log- [cb & site-id] (println "TODO"))
 
 #? (:clj
-    (deftype CausalBase [cb]
-      Counted
-      (count [this] (clojure.core/count (get-causal (.cb this))))
-
-      Seqable
-      (seq [this] (clojure.core/seq (get-causal (.cb this)))))
+    (deftype CausalBase [cb])
 
     :cljs
     (deftype CausalBase [cb]
-      ICounted
-      (-count [this] (clojure.core/count (get-causal (.-cb this))))
-
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#causal/base " (pr-str (s/causal->edn o)))))
-
-      ISeqable
-      (-seq [this] (clojure.core/seq (get-causal (.-cb this))))))
+        (-write writer (str "#causal/base " (pr-str (s/causal->edn o)))))))
 
 #? (:clj (defmethod print-method CausalBase [^CausalBase o ^java.io.Writer w]
            (.write w (str "#causal/base " (pr-str (s/causal->edn o))))))
@@ -294,7 +345,11 @@
 (extend-type CausalBase
   proto/CausalBase
   (transact [this txs] (CausalBase. (transact- (.-cb this) txs)))
-  (follow-ref [this ref] (get-causal (.-cb this) ref))
+  (get-collection
+    ([this] (get-collection- (.-cb this)))
+    ([this ref-or-uuid] (get-collection- (.-cb this) ref-or-uuid)))
+  (gen-hide-txs-for-range [this start-path end-path opts]
+    (gen-hide-txs-for-range- (.-cb this) start-path end-path opts))
 
   proto/CausalMeta
   (get-uuid [this] (::s/uuid (.-cb this)))
@@ -340,13 +395,9 @@
   (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
   (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]]) ; TODO: add a 4th raw-value? slot to tx
 
-  (count (new-causal-base))
-  (seq (new-causal-base))
-  (proto/follow-ref (new-causal-base) nil)
+  (proto/get-collection (new-causal-base) nil)
   (def cb (proto/transact (new-causal-base) [[nil nil [:div {:a 1} "foo" [:span "bar"]]]]))
-  (count cb)
-  (seq cb)
-  (seq (get-causal (.-cb cb) (peek (second (seq cb)))))
-  (seq (proto/follow-ref cb (peek (second (seq cb)))))
+  (seq (get-collection- (.-cb cb) (peek (second (seq cb)))))
+  (seq (proto/get-collection cb (peek (second (seq cb)))))
   (seq cb :cause.base.ref/OysqODJodVrFe5l5rxNx9)
   (proto/causal->edn (proto/transact (new-causal-base) [[nil nil [:div {:a 1} "foo" [:span "bar"]]]])))

@@ -26,7 +26,8 @@
 (redef new-causal-base c-base/new-causal-base)
 (redef transact proto/transact)
 (redef ref? c-base/ref?)
-(redef follow-ref proto/follow-ref)
+(redef get-collection proto/get-collection)
+(redef gen-hide-txs-for-range proto/gen-hide-txs-for-range)
 
 ;;;;;;;;;;;; Other Stuff ;;;;;;;;;;;;
 

@@ -38,5 +38,7 @@
 (defprotocol CausalBase
   (transact [causal-base txs]
     "Apply one or many \"changes\" at the current logical time.")
-  (follow-ref [causal-base ref]
-    "Returns the causal collection referenced by the ref."))
+  (get-collection [causal-base] [causal-base ref-or-uuid]
+    "Returns the causal collection referenced by the uuid or ref.
+    If no uuid or ref is passed, the root collection will be returned.")
+  (gen-hide-txs-for-range [this start-path end-path opts]))

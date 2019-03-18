@@ -1,6 +1,30 @@
 # Cause [![Build][travis-image]][travis-url]
 
-> An EDN-like CRDT (Causal Tree) for Clojure(Script) that automatically tracks history and resolves conflicts. This implementation takes a lot of cues from [Data Laced with History](http://archagon.net/blog/2018/03/24/data-laced-with-history/) and many papers on the topic of CRDTs.
+> An EDN-like CRDT (Causal Tree) for Clojure(Script) that automatically tracks history and resolves conflicts.
+
+Cause is like git for collaborative applications. Cause is designed to look and feel like normal EDN data structures (`maps`, `lists`), while also exposing the richness of append only CvRDTs that power this causal EDN. Cause handles common problems like deterministically synchronizing complex data structures across devices, and tracking history. Rather than rely on a central authority, conflicts can be resolved on every client. Making Cause well suited for decentralized p2p applications.
+
+The implementation takes a lot of cues from [Data Laced with History](http://archagon.net/blog/2018/03/24/data-laced-with-history/) and [prior art](#inspiration-reference--prior-art) related to CRDTs.
+
+## Why?
+
+Why create Cause? Why another CRDT?
+
+Before starting Cause I was working on [a rich text editor](https://github.com/smothers/slate-eunoia) in [Slate](https://github.com/ianstormtaylor/slate). I wanted online/offline sync, collaboration, granular version control, zero dependency on a centralized server, and all of this in one persistent data structure that's easy to render, edit and save to a database. Projects like [Automerge](https://github.com/automerge/automerge) and [Schism](https://github.com/aredington/schism) offered compelling solutions, but fell short on one or more of the properties I was looking for.
+
+## Properties
+
+This is what Cause strives to do:
+
+1. **One data structure for everything.** In Cause this is the `node`. Nodes are just values. They store identity and causality, and can easily be sent between clients, written to a database and rendered. Multiple in memory caches make the read and write performance of common node operations fast. And those caches can be reconstituted from a bag of related nodes at runtime, so at rest storage is reduced.
+
+2. **Persist all the data.** Clojure's immutable data structures and immutable data in general is great! It's hard to call Cause immutable since it is designed to be used in distributed eventually consistent systems. Nodes will inevitably arrive in different orders and clients will often have different sets of nodes. What can be guaranteed is that no node is deleted. Cause is append only, with deletions being represented by adding tombstones that hide nodes instead of actually excising the original data. This is similar to [Datomic](https://www.datomic.com/) and makes infinite undo and change tracking possible.
+
+3. **Simple conflict resolution.** The functions that determine the current state of a causal collection should be easy to reason about. This makes them easier to develop correctly and easier to work with intuitively since they have very few corner cases.
+
+4. **Idiomatic EDN.** The higher level causal data structures that are built from `nodes` implement many of the same protocols as their EDN counterparts. Most Clojure functions should just work on CausalLists and CausalMaps the same way they'd work on lists and maps.
+
+5. **Extended EDN.** Causal collections have some properties that don't fit into existing Clojure collection protocols, specifically identity and history that can span multiple interrelated collections. Facilities should be provided to manage these database-like properties efficiently and easily.
 
 ## How it Works
 
@@ -19,15 +43,15 @@
       - in a list `cause` is the `id` of the preceding node, creating a linked list
       - in a map `cause` is the `key`
     - `value` is whatever you set it to, a string, a keyword, another causal collection
-      - since causal collections are append only, if you want to delete (hide) a value you must append a `cause/hide` value. This is non destructive and enables synchronization and time travel.
+      - since causal collections are append only, if you want to delete (hide) a value you must insert a `cause/hide` value. This is non destructive and enables synchronization and time travel.
 
-Nodes are all you need. From an unordered pile of nodes we can consistently weave (order) them every time. Nodes are also unique so we can deduplicate them across a chatty network. And they include complete history information: time = `lamport-ts`, who = `site-id`, transaction = `lamport-ts` and `site-id`, tx order = `tx-index`. They do not include wall clock time, but they do have everything needed for infinite undo / redo as well as version control and blame tracking.
+Nodes are all you need. From a bag of nodes we can consistently weave (build an ordered cache of) them every time. Nodes are also unique so we can deduplicate them across a chatty network. And they include complete history information: time = `lamport-ts`, who = `site-id`, transaction = `lamport-ts` & `site-id`, tx order = `tx-index`. They do not include wall clock time, but they do have everything needed for infinite undo / redo as well as version control and blame tracking.
 
 Cause trades a constant increase in spacial complexity for all the properties above. Lists are the most complicated to keep sorted and suffer from a linearly increasing time complexity on both reads and writes. Fortunately transacting contiguous sequences is O(n + m) and not O(n * m), so operations like pasting a large sequence stays linear.
 
 ## Installation
 
-The API and data structures have no guarantee of stability until 0.1.0 is published ([See Roadmap](https://github.com/smothers/cause#roadmap)).
+The API and data structures have no guarantee of stability until 0.1.0 is published ([See Roadmap](#roadmap)).
 
 If you want to try this pre-release code that will likely change you can use [git deps](https://www.clojure.org/news/2018/01/05/git-deps).
 

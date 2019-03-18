@@ -34,12 +34,12 @@
       (is (= [\h \i 1 2] (b/cb->edn (b/transact- cb [[(::b/root-uuid cb) c/root-id ["hi"]]]))))
       (is (= [[\h \i] 1 2] (b/cb->edn (b/transact- cb [[(::b/root-uuid cb) c/root-id [["hi"]]]])))))))
 
-(deftest test-CausalBase-clojure-core-fns
-  (is (= 0 (count (c/new-causal-base))))
-  (is (= nil (seq (c/new-causal-base))))
+(deftest test-CausalBase
+  (is (= 0 (count (c/get-collection (c/new-causal-base)))))
+  (is (= nil (seq (c/get-collection (c/new-causal-base)))))
   (let [cb (c/transact (c/new-causal-base) [[nil nil [1 2 3]]])]
-    (is (= 3 (count cb)))
-    (is (= [1 2 3] (mapv peek (seq cb))))))
+    (is (= 3 (count (c/get-collection cb))))
+    (is (= [1 2 3] (mapv peek (seq (c/get-collection cb)))))))
 
 (comment
   (test-cb->edn)

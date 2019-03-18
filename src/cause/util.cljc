@@ -60,6 +60,8 @@
 (defn char-code-at [str pos]
   #? (:clj (.charAt str pos)
            :cljs (.charCodeAt str pos)))
+; OPTIMIZE: this breaks on long strings
+; NOTE: do not use util optimized.
 (defn char-seq
   "Return a seq of the characters in a string, making sure not to split up
   UCS-2 (or is it UTF-16?) surrogate pairs. Because JavaScript. And Java."
