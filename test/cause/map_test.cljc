@@ -66,7 +66,16 @@
     (is (= (list node) (seq (-> (c/new-causal-map :foo "bar") (dissoc :foo) (c/insert node))))))
   (is (= "bar" (:foo (conj (c/new-causal-map) {:foo "bar"}))))
   (is (int? (hash (c/new-causal-map :foo "bar"))))
-  (is (= "{:foo \"bar\"}" (str (c/new-causal-map :foo "bar")))))
+  (is (= "{:foo \"bar\"}" (str (c/new-causal-map :foo "bar"))))
+  (is (= nil
+         (-> (c/new-causal-map :foo "bar")
+             (dissoc :foo)
+             (get :foo))))
+  (is (= "bar"
+         (-> (c/new-causal-map :foo "bar")
+             (dissoc :foo)
+             (assoc :foo c/show)
+             (get :foo)))))
 
 (comment
   (do

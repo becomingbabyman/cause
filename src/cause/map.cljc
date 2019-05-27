@@ -60,7 +60,10 @@
 
 (defn get-
   ([causal-tree k]
-   (peek (first (get-in causal-tree [::s/weave k])))))
+   (let [kvs [k (seq (get-in causal-tree [::s/weave k]))]
+         node (active-node kvs)]
+     (when (not (= node ::blank))
+       (peek node)))))
 
 (defn count- [causal-tree]
   (reduce-kv
