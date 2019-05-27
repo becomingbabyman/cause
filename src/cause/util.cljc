@@ -47,6 +47,22 @@
                      (insert coll i val opts) coll))
   ([coll i val {:keys [next-vals]}] (into (subvec coll 0 i) cat [[val] next-vals (subvec coll i)])))
 
+(defn binary-search
+  "Takes a sorted vector a value and an optinal comparator fn.
+  Returns a matching index."
+  ([xs x]
+   (binary-search xs x = <))
+  ([xs x match-fn less-than-fn]
+   (loop [left 0
+          right (dec (count xs))]
+     (when (<= left right)
+       (let [i (quot (+ left right) 2)
+             v (xs i)]
+         (cond
+           (match-fn v x) i
+           (less-than-fn v x) (recur (inc i) right)
+           :else (recur left (dec i))))))))
+
 (defmacro redef
   "Moves a symbol to the current ns, preserving the docstring and arglists."
   [symbol value]

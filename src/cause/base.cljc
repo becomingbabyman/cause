@@ -16,6 +16,7 @@
 
 (spec/def ::reverse-path (spec/tuple ::s/id ::s/uuid)) ; Starts with id to make sorting easier
 (spec/def ::history (spec/coll-of ::reverse-path ::gen-max 3)) ; Sorted log of all insertions
+(spec/def ::last-undo-lamport-ts ::s/lamport-ts) ; The most recently undone lamport-ts
 (spec/def ::root-uuid ::s/uuid)
 ; TODO: ::collections actually stores CausalTrees not ::s/causal-trees...
 (spec/def ::collections (spec/map-of ::s/uuid ::s/causal-tree :gen-max 3))
@@ -23,6 +24,7 @@
                                          ::s/lamport-ts
                                          ::s/site-id
                                          ::history
+                                         ::last-undo-lamport-ts
                                          ::root-uuid
                                          ::collections]))
 
@@ -41,6 +43,7 @@
    ::s/uuid (u/new-uid)
    ::s/site-id (s/new-site-id)
    ::history []
+   ::last-undo-lamport-ts nil
    ::root-uuid nil
    ::collections {}})
 
@@ -235,7 +238,10 @@
     [cb tx-index]))
 
 (defn transact-
-  "Automatically manages lamport-ts and tx-index when transacting into
+  "Takes a causal-base and a vector of transactions in the format of
+  `[[uuid cause value] ...]` where values can be scalars or collections
+  that have causal implementations (including vectors).
+  Automatically manages lamport-ts and tx-index when transacting into
   multiple collections in a causal-base. The monotonic increasing of
   tx-index will correspond to the order of `txs` and the values in them.
   Transforms EDN values to their corresponding causal collections."
@@ -252,10 +258,81 @@
 ; TODO: normalize transaction / abort if can't normalize
 ;   Normalization is probably a fn or schema that gets passed to transact
 
-; (defn reset- [cb site-id lamport-ts] (println "TODO"))
-; (defn get-history- [cb & site-id] (println "TODO"))
-; (defn undo- [cb & site-id] (println "TODO"))
-; (defn redo- [cb & site-id] (println "TODO"))
+(defn get-history- [cb]
+  (::history cb))
+
+(defn reset-
+  "Undoes all transactions going back to the provided site-id and lamport-ts"
+  [cb site-id lamport-ts]
+  (println "TODO"))
+
+(defn undo-
+  "Returns a cb with the next transaction in the 'undo stack' undone."
+  ([cb]
+   (undo- cb (::s/site-id cb)))
+  ([cb site-id]
+   (let [history (::history cb)
+         last-undo-i (when (not (nil? (::last-undo-lamport-ts cb)))
+                       (u/binary-search history
+                                        [(::last-undo-lamport-ts cb) site-id 0]
+                                        #(= (first %1) %2)
+                                        #(<< (first %1) %2)))
+         history (if last-undo-i
+                   (loop [history (subvec history 0 last-undo-i)]
+                     (if (= (::last-undo-lamport-ts cb) (ffirst (peek history)))
+                       (recur (pop history))
+                       history))
+                   history)
+         reverse-paths (loop [lamport-ts nil
+                              history history
+                              reverse-paths []]
+                         (if (empty? history)
+                           reverse-paths
+                           (let [path (peek history)
+                                 path-sid (second (first path))]
+                             (cond
+                               (and lamport-ts
+                                    (or (not= lamport-ts (ffirst path))
+                                        (not= path-sid site-id))) reverse-paths
+                               (= path-sid site-id) (recur (ffirst path) (pop history) (conj reverse-paths path))
+                               :else (recur lamport-ts (pop history) reverse-paths)))))]
+     (undo- cb site-id reverse-paths)))
+  ([cb site-id reverse-paths]
+   (let [undo-txs (mapv (fn [[id uuid]]
+                          (let [causal (.ct (get-collection- cb uuid))
+                                [cause value] (get-in causal [::s/nodes id])]
+                            (case value
+                              ::s/hide [uuid cause ::s/show]
+                              ::s/show [uuid cause ::s/hide]
+                              [uuid
+                               (if (= (::s/type causal) ::s/map) cause id)
+                               ::s/hide])))
+                        reverse-paths)
+         cb (transact- cb undo-txs)]
+     (assoc cb ::last-undo-lamport-ts (first (ffirst reverse-paths))))))
+
+(comment
+  (do
+    (def cb (atom (new-cb)))
+    (swap! cb transact- [[nil nil {:a 1 :b 2}]])
+    (swap! cb transact- [[(::root-uuid @cb) :a 3]])
+    (get-history- @cb))
+  (:a (get-collection- @cb))
+  (swap! cb assoc ::last-undo-lamport-ts nil)
+  (.ct (get-collection- (undo- @cb)))
+  (seq (get-collection- (undo- @cb)))
+  (swap! cb undo-)
+  (:b (get-collection- @cb))
+  (swap! cb redo))
+
+(defn redo-
+  "Undoes the most recent transaction that is not an redo performed by
+  the provided site-id"
+  ([cb]
+   (redo- cb (::s/site-id cb)))
+  ([cb site-id]
+   (println "TODO")))
+
 ; (defn log- [cb & site-id] (println "TODO"))
 
 #? (:clj
@@ -314,7 +391,7 @@
   (transact- @acbm [[(::root-uuid @acbm) :a {:ee 3 :ff [1 2 3]}]])
 
   (def acbl (atom (new-cb)))
-  (swap! acbl transact [[nil nil [1 2 3]]])
+  (swap! acbl transact- [[nil nil [1 2 3]]])
   (transact- @acbl [[(::root-uuid @acbl) s/root-id 4]
                     [(::root-uuid @acbl) s/root-id 5]])
   (transact- @acbl [[(::root-uuid @acbl) s/root-id "hey"]])
