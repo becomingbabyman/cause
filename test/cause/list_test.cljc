@@ -1,7 +1,7 @@
 (ns cause.list-test
   (:require [cause.shared :as s]
             [cause.core :as c]
-            [cause.list :as c-list]
+            [cause.list :as c.list]
             [clojure.string :as string]
             [clojure.test :refer [deftest is]]
             #? (:clj [criterium.core :refer [quick-bench]])))
@@ -33,7 +33,7 @@
 
 (defn idempotent? [causal-list]
   (let [causal-tree (.-ct causal-list)
-        refreshed-ct (s/refresh-caches c-list/weave causal-tree)]
+        refreshed-ct (s/refresh-caches c.list/weave causal-tree)]
     (is (= (::s/site-id causal-tree) (::s/site-id refreshed-ct)))
     (is (= (::s/lamport-ts causal-tree) (::s/lamport-ts refreshed-ct)))
     (is (= (::s/nodes causal-tree) (::s/nodes refreshed-ct)))
@@ -103,13 +103,13 @@
           step 0]
      (if (>= step max-steps)
        nil
-       (if (is (= (c/get-weave cl) (::s/weave (c-list/weave (.-ct cl)))))
+       (if (is (= (c/get-weave cl) (::s/weave (c.list/weave (.-ct cl)))))
          (let [node (rand-node cl)]
            (recur (c/insert cl node) (conj insertions node) (inc step)))
          {:insertions insertions
           :step step
           :initial (c/causal->edn cl)
-          :reweave (c/causal->edn (c-list/weave cl))})))))
+          :reweave (c/causal->edn (c.list/weave cl))})))))
 
 (deftest try-to-find-new-idempotent-edge-cases
   (is (empty? (keep (fn [_] (find-weave-inconsistencies 9))
@@ -152,7 +152,7 @@ respecting it." #" "))
           :insertions insertions
           :phrases starting-phrases
           :materialized-weave (apply str (c/causal->edn cl))
-          :materialized-reweave (apply str (c/causal->edn (c-list/weave (.-ct cl))))})))))
+          :materialized-reweave (apply str (c/causal->edn (c.list/weave (.-ct cl))))})))))
 
 (deftest concurrent-runs-stick-together
   (let [result (rand-weave-of-phrases 5)]

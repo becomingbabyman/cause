@@ -1,4 +1,4 @@
-# Cause [![Build][travis-image]][travis-url]
+# Cause [![Build][travis-image]][travis-url] ![Licensed under MIT](https://img.shields.io/badge/license-MIT-blue.svg) <a href='http://www.recurse.com' title='Made with love at the Recurse Center'><img src='https://cloud.githubusercontent.com/assets/2883345/11325206/336ea5f4-9150-11e5-9e90-d86ad31993d8.png' height='20px'/></a>
 
 > An EDN-like CRDT (Causal Tree) for Clojure(Script) that automatically tracks history and resolves conflicts.
 
@@ -76,9 +76,6 @@ user=> (cljs) ; to get a cljs repl
 cljs.user=> :cljs/quit ; to go back to clj repl
 ```
 
-[travis-image]: https://img.shields.io/travis/smothers/cause.svg?style=flat-square
-[travis-url]: https://travis-ci.org/smothers/cause
-
 ## Notes
 
 ### Clojure Collection Functions
@@ -130,7 +127,7 @@ Causal collections will automatically track the order values are inserted into t
 - [x] ⏳ Basic merge and weft (time travel) functions. Needs revision.
 - [x] 🗺 Implement `CausalMap`
 - [x] ƛ Implement common Clojure collection protocols in CLJ(S) for CausalList and CausalMap
-- [x] 🏎 Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes. This mostly came from me stupidly using `last` instead of `peek`.
+- [x] 🏎 Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes.
 - [x] 🥞 Add transaction support to the data model via `tx-index`
 - [x] ✅ Full test coverage for collection protocol implementations
 - [x] ƛ EDN -> Causal transformation function
@@ -165,3 +162,6 @@ Causal collections will automatically track the order values are inserted into t
   - [ ] Add more logging facilities so that in the case of a malicious site other sites can manually rollback and recover to a "correct" state
   - [ ] See if automatic attack detection / prevention is feasible
     - [ ] Maybe make it optional in exchange for poorer performance characteristics
+
+[travis-image]: https://img.shields.io/travis/smothers/cause.svg
+[travis-url]: https://travis-ci.org/smothers/cause

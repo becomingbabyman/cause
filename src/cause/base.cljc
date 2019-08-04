@@ -1,10 +1,11 @@
 (ns cause.base
+  "Like a database, but for nested causal collections."
   (:require [clojure.spec.alpha :as spec]
             [cause.util :as u :refer [<<]]
             [cause.shared :as s]
             [cause.protocols :as proto]
-            [cause.list :as c-list]
-            [cause.map :as c-map]
+            [cause.list :as c.list]
+            [cause.map :as c.map]
             #? (:cljs [cause.list :refer [CausalList]])
             #? (:cljs [cause.map :refer [CausalMap]]))
   #? (:clj (:import (cause.list CausalList)
@@ -27,12 +28,11 @@
                                          ::last-undo-lamport-ts
                                          ::root-uuid
                                          ::collections]))
-
-; TODO: add a 4th optional slot to the tx tuple for `::raw-value?`
+; TODO: add a 4th optional slot to the tx-part tuple for `::raw-value?`
 ; TODO: should ::s/value be replaced with another type of "value" since it
 ;   can be processed and broken into many sub ::s/values by the transact fn?
-(spec/def ::tx (spec/tuple ::s/uuid ::s/cause ::s/value))
-(spec/def ::txs (spec/coll-of ::tx :gen-max 3))
+(spec/def ::tx-part (spec/tuple ::s/uuid ::s/cause ::s/value))
+(spec/def ::tx (spec/coll-of ::tx-part :gen-max 3))
 
 (defn new-cb
   "Like a database, but comprised of nested causal collections. If you
@@ -108,8 +108,8 @@
 
 (defn add-collection-of-this-values-type-to-cb [cb value & {:keys [is-root?]}]
   (if-let [causal (cond
-                    (map? value) (c-map/new-causal-map)
-                    (seqable? value) (c-list/new-causal-list)
+                    (map? value) (c.map/new-causal-map)
+                    (seqable? value) (c.list/new-causal-list)
                     :else nil)]
     (let [uuid (proto/get-uuid causal)
           cb (assoc-in cb [::collections uuid] causal)
@@ -197,7 +197,7 @@
       (and (not (map? value)) (seqable? value) (instance? CausalList causal)) true
       :else false)))
 
-(defn handle-tx-value [cb [uuid cause value :as tx] tx-index]
+(defn handle-tx-part-value [cb [uuid cause value :as tx-part] tx-index]
   (let [causal (get-in cb [::collections uuid])]
     (if (merge-value-into-parent-collection? cb uuid cause value)
       (let [[cb tx-index nodes] (value->nodes cb tx-index cause value)
@@ -208,14 +208,14 @@
             cb (insert cb uuid [node])]
         [cb tx-index]))))
 
-(defn handle-tx-potential-root
-  "A tx without a `uuid` will create a new root collection."
-  [cb [uuid cause value :as tx]]
+(defn handle-tx-part-potential-root
+  "A tx-part without a `uuid` will create a new root collection."
+  [cb [uuid cause value :as tx-part]]
   (if uuid
     [cb uuid]
     (add-collection-of-this-values-type-to-cb cb value :is-root? true)))
 
-(defn validate-tx [cb [uuid cause value :as tx]]
+(defn validate-tx-part [cb [uuid cause value :as tx-part]]
   (let [causal (get-in cb [::collections uuid])]
     (when (and uuid (not (::root-uuid cb)))
       (throw (ex-info "Please transact a root collection first by setting uuid and cause to nil"
@@ -227,39 +227,78 @@
       (throw (ex-info "Root node must satisfy the coll? predicate"
                       {:value value})))))
 
-(defn handle-tx
-  "Performs one tx in a transaction. `value`s with EDN collections will be converted to causal
+(defn handle-tx-part
+  "Performs one tx-part in a transaction. `value`s with EDN collections will be converted to causal
   collections. Nested collections will be flattened into the collections map
   and referenced by their uuid."
-  [cb [uuid cause value :as tx] tx-index]
-  (let [_ (validate-tx cb tx)
-        [cb uuid] (handle-tx-potential-root cb tx)
-        [cb tx-index] (handle-tx-value cb [uuid cause value] tx-index)]
+  [cb [uuid cause value :as tx-part] tx-index]
+  (let [_ (validate-tx-part cb tx-part)
+        [cb uuid] (handle-tx-part-potential-root cb tx-part)
+        [cb tx-index] (handle-tx-part-value cb [uuid cause value] tx-index)]
     [cb tx-index]))
 
 (defn transact-
-  "Takes a causal-base and a vector of transactions in the format of
-  `[[uuid cause value] ...]` where values can be scalars or collections
-  that have causal implementations (including vectors).
-  Automatically manages lamport-ts and tx-index when transacting into
-  multiple collections in a causal-base. The monotonic increasing of
-  tx-index will correspond to the order of `txs` and the values in them.
-  Transforms EDN values to their corresponding causal collections."
-  [cb txs]
+  "Takes a causal-base and a transaction. The tx is in the format of
+  `[[collection-uuid cause value] ...]`
+  where value is a scalar or collection that has a causal implementation
+  (including vectors). Automatically manages lamport-ts and tx-index when
+  transacting into multiple collections in a causal-base. The monotonic
+  increasing of tx-index will correspond to the order of `tx-parts` and
+  the values in them. Transforms EDN values to their corresponding causal
+  collections."
+  [cb tx]
   (loop [cb cb
-         [tx & txs] txs
+         [tx-part & tx] tx
          tx-index 0]
-    (if tx
-      (let [[cb tx-index] (handle-tx cb tx tx-index)]
-        (recur cb txs tx-index))
+    (if tx-part
+      (let [[cb tx-index] (handle-tx-part cb tx-part tx-index)]
+        (recur cb tx tx-index))
       (update cb ::s/lamport-ts inc))))
 ; TODO: retract whole collections
 ; TODO: retract contiguous chunks from [uuid1, id1] -> [uuid2, id2]
 ; TODO: normalize transaction / abort if can't normalize
 ;   Normalization is probably a fn or schema that gets passed to transact
 
+;;;;;;;;;
+
+; TODO: History Manipulation
+; Every operation must be addative, so an undo adds
+; an inverse transaction rather than deleting a transaction
+; --- Goals ---
+; - (re)construct history from immutable data stored in causal-trees
+; - simulate an undo stack
+; - simulate a redo stack
+; - infinite undo back to first tx-part
+; - show history / changelog
+; - show blame, who made which tx
+; - scrub through timeline like a youtube video
+; - reset to any point in time like `git reset`
+; --- Functions ---
+; [] undo (last local tx-part)
+; [] redo (last local undo)
+; [] reset (to any tx-part in the history)
+;    Can this be the primary function that drives everything else?
+;    - [tx-part]
+;    - options [tx-part, [site-ids-to-undo...]]
+;    - allow different arities to pass in opitmizations?
+
 (defn get-history- [cb]
   (::history cb))
+
+(defn find-nodes-in-tx-part
+  "Returns the nodes given the lamport-ts and site-id of a transaction."
+  [cb lamport-ts site-id]
+  (println "TODO"))
+
+(defn invert-nodes
+  "Generates invert nodes given a list of nodes."
+  [cb nodes]
+  (println "TODO"))
+
+(defn invert-tx-part
+  "Generates invert tx given the lamport-ts and site-id of a transaction."
+  [cb lamport-ts site-id]
+  (println "TODO"))
 
 (defn reset-
   "Undoes all transactions going back to the provided site-id and lamport-ts"
@@ -298,17 +337,21 @@
                                :else (recur lamport-ts (pop history) reverse-paths)))))]
      (undo- cb site-id reverse-paths)))
   ([cb site-id reverse-paths]
-   (let [undo-txs (mapv (fn [[id uuid]]
-                          (let [causal (.ct (get-collection- cb uuid))
-                                [cause value] (get-in causal [::s/nodes id])]
-                            (case value
-                              ::s/hide [uuid cause ::s/show]
-                              ::s/show [uuid cause ::s/hide]
-                              [uuid
-                               (if (= (::s/type causal) ::s/map) cause id)
-                               ::s/hide])))
-                        reverse-paths)
-         cb (transact- cb undo-txs)]
+   (let [undo-tx (mapv (fn [[id uuid]]
+                         (let [causal (.ct (get-collection- cb uuid))
+                               [cause value] (get-in causal [::s/nodes id])]
+                           (case value
+                              ; TODO: undo should behave differently for maps vs lists.
+                              ;   lists can do this show / hide thing
+                              ;   maps need to look back in the weave of a given key pick the previous value...
+                              ;     Should map show / hide be reimplemented to make it more like lists??? Is that possible?
+                             ::s/hide [uuid cause ::s/show]
+                             ::s/show [uuid cause ::s/hide]
+                             [uuid
+                              (if (= (::s/type causal) ::s/map) cause id)
+                              ::s/hide])))
+                       reverse-paths)
+         cb (transact- cb undo-tx)]
      (assoc cb ::last-undo-lamport-ts (first (ffirst reverse-paths))))))
 
 (comment
@@ -322,7 +365,14 @@
   (.ct (get-collection- (undo- @cb)))
   (seq (get-collection- (undo- @cb)))
   (swap! cb undo-)
-  (:b (get-collection- @cb))
+  (:a (get-collection- @cb))
+  (do
+    (def cb (atom (new-cb)))
+    (swap! cb transact- [[nil nil [1]]])
+    (swap! cb transact- [[nil s/root-id 2]])
+    (deref cb)
+    (swap! cb transact- [[(::root-uuid @cb)]])
+    (get-history- @cb))
   (swap! cb redo))
 
 (defn redo-
@@ -356,7 +406,7 @@
 
 (extend-type CausalBase
   proto/CausalBase
-  (transact [this txs] (CausalBase. (transact- (.-cb this) txs)))
+  (transact [this tx] (CausalBase. (transact- (.-cb this) tx)))
   (get-collection
     ([this] (get-collection- (.-cb this)))
     ([this ref-or-uuid] (get-collection- (.-cb this) ref-or-uuid)))
@@ -403,7 +453,7 @@
   (transact- @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]])
   ;
   (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]]) ; TODO: add a 4th raw-value? slot to tx
+  (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]]) ; TODO: add a 4th raw-value? slot to tx-part
 
   (proto/get-collection (new-causal-base) nil)
   (def cb (proto/transact (new-causal-base) [[nil nil [:div {:a 1} "foo" [:span "bar"]]]]))

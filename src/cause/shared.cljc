@@ -38,6 +38,7 @@
                                    #(gen-string site-id-length)))
 (spec/def ::tx-index nat-int?) ; the index in a transaction (every ::lamport-ts is a transaction of one or more insertions)
 (spec/def ::id (spec/tuple ::lamport-ts ::site-id ::tx-index))
+(spec/def ::tx-id (spec/tuple ::lamport-ts ::site-id)) ; The first 2 values of an ::id make up a uniquely identifiable ::tx-id
 (spec/def ::key (spec/or :k keyword?
                          :s string?))
 (spec/def ::cause (spec/or :previous-list-item ::id
