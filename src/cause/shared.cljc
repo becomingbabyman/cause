@@ -40,9 +40,9 @@
 (spec/def ::id (spec/tuple ::lamport-ts ::site-id ::tx-index))
 (spec/def ::tx-id (spec/tuple ::lamport-ts ::site-id)) ; The first 2 values of an ::id make up a uniquely identifiable ::tx-id
 (spec/def ::key (spec/or :k keyword?
-                         :s string?))
-(spec/def ::cause (spec/or :previous-list-item ::id
-                           :map-key ::key))
+                         :s string?)) ; TODO: EDN supports more key values, but for now these are all that are guaranteed to work in causal-maps
+(spec/def ::cause (spec/or :id ::id
+                           :key ::key))
 (spec/def ::value (spec/or :special-k special-keywords
                            :c char?
                            :s string?
@@ -64,9 +64,10 @@
 (spec/def ::yarn (spec/coll-of ::node :gen-max 3)) ; site specific time sorted vector
 (spec/def ::yarns (spec/map-of ::site-id ::yarn :gen-max 3)) ; map of yarns keyed by site-id
 
-(spec/def ::weave (spec/or
-                   :list-weave (spec/coll-of ::node :gen-max 3) ; ordered vector of operations in the order of their output
-                   :map-weave (spec/map-of ::key (spec/coll-of ::node :gen-max 3) :gen-max 3))) ; map of ordered vectors corresponding to keys
+(spec/def ::list-weave (spec/coll-of ::node :gen-max 3)) ; ordered vector of operations in the order of their output)
+(spec/def ::map-weave (spec/map-of ::key ::list-weave :gen-max 3)) ; map of ordered vectors corresponding to keys)
+(spec/def ::weave (spec/or :list-weave ::list-weave
+                           :map-weave ::map-weave))
 
 (spec/def ::causal-tree (spec/keys :req [::nodes ::lamport-ts ::uuid ::site-id]
                                    :opt [::yarns ::weave]))
@@ -189,6 +190,55 @@
   (let [ct2 (update-in causal-tree [::lamport-ts] inc)
         node (new-node (::lamport-ts ct2) (::site-id ct2) cause value)]
     (insert weave-fn ct2 node)))
+
+(defn weave-asap?
+  "Takes a left, a middle and a right node. Returns true if the middle
+  node should be inserted as soon as possible."
+  [nl nm nr]
+  (or
+   (= (first nl) (second nm)) ; Always try to weave a node after its cause.
+   (= (first nm) (second nr)))) ; Always try to weave a node before a node it causes.
+
+(defn weave-later?
+  "Takes a left, a middle and a right node. Returns true if the middle
+  node cannot be inserted between the left and the right for any reason.
+  This assumes that you already want to weave-asap?."
+  [nl nm nr seen]
+  (or
+   (and
+    (special-keywords (peek nr)) ; if the next node is a hide or a show
+    (not= (first nm) (second nr)) ; and it does not hide or show this node
+    (or (not (special-keywords (peek nm))) ; and this node is not also a hide or a show
+        (<< (first nm) (first nr)))) ; or if it is, but it is older, don't weave.
+   (and
+    (or (= (first nl) (second nr)) ; if the next node is caused by the previous node
+        (= (second nl) (second nr)) ; or if the next node shares a cause with the previous node
+        (contains? seen (second nr))) ; or the next node is caused by a seen node
+    (<< (first nm) (first nr)) ; and this node is older
+    (or (not (special-keywords (peek nm))) ; and this node is not a hide or a show
+        (special-keywords (peek nr)))) ; or the next node is a hide or a show, don't weave.
+   (and
+    (<< (first nm) (first nr)) ; if this node is older than the next
+    (or (not (special-keywords (peek nm))) ; and this node is not a hide or a show
+        (special-keywords (peek nr)))))) ; or the next node is a hide or a show, don't weave.
+
+(defn weave-node
+  "Returns an ::list-weave with the node woven in."
+  ([current-weave node] (weave-node current-weave node nil))
+  ([current-weave node more-consecutive-nodes-in-same-tx]
+   (loop [left []
+          right current-weave
+          prev-asap false
+          seen-since-asap #{}]
+     (let [nl (peek left)
+           nr (first right)
+           asap (or prev-asap (weave-asap? nl node nr))]
+       (if (or (empty? right)
+               (and asap (not (weave-later? nl node nr seen-since-asap))))
+         (into left cat [[node] more-consecutive-nodes-in-same-tx right])
+         (recur (conj left nr) (rest right) asap (if asap
+                                                   (conj seen-since-asap (first nl))
+                                                   seen-since-asap)))))))
 
 (defn refresh-ts
   "Refreshes the ::lamport-ts to make sure it's the max value in the tree.

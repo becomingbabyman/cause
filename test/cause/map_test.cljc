@@ -1,7 +1,7 @@
 (ns cause.map-test
   (:require [cause.core :as c]
             [clojure.string :as string]
-            [clojure.test :refer [deftest is]]))
+            [clojure.test :refer [deftest testing is]]))
 
 (deftest basic-map-test
   (-> (c/new-causal-map)
@@ -30,6 +30,18 @@
     (swap! ct c/append :foo c/show)
     (swap! ct c/append :foo c/show)
     (is (= {:foo "boo" :fizz "buzz"} (c/causal->edn @ct)))))
+
+(deftest hide-and-show-by-node-id
+  (let [ct (atom (c/new-causal-map :foo "bar"))]
+    (is (= {:foo "bar"} (c/causal->edn @ct)))
+    (swap! ct c/append :foo "boo")
+    (is (= {:foo "boo"} (c/causal->edn @ct)))
+    (testing "id based causes instead of keys"
+      (let [boo-id (ffirst (seq @ct))]
+        (swap! ct c/append boo-id c/hide)
+        (is (= {:foo "bar"} (c/causal->edn @ct)))
+        (swap! ct c/append boo-id c/show)
+        (is (= {:foo "boo"} (c/causal->edn @ct)))))))
 
 (deftest core-cljc-map-protocol-test
   ; empty? dissoc assoc (:keyword) get get-in
@@ -81,4 +93,5 @@
   (do
     (basic-map-test)
     (hide-and-show-and-hide-and-show-test)
+    (hide-and-show-by-node-id)
     (core-cljc-map-protocol-test)))

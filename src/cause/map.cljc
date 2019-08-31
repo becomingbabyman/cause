@@ -2,6 +2,7 @@
   (:require [cause.util :as u :refer [<<]]
             [cause.shared :as s]
             [cause.protocols :as proto]
+            [clojure.spec.alpha :as spec]
             #? (:cljs [cljs.reader]))
   #? (:clj
       (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
@@ -18,57 +19,59 @@
    ::s/yarns {}
    ::s/weave {}})
 
-; NOTE: a weave is a map of :key [[id value] [id value]] pairs.
-;   The vector of values is sorted by id with the newest id
-;   at the front of this vector.
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
   If a node is passed only that node will be woven in O(n). This is
-  much fast in practice. The worst case only occurs when one key
-  is continually changed. Most maps will have many keys that are
-  infrequently changed."
+  much faster in practice. The worst case only occurs when a single key
+  is continually changed."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave {})
            (map s/new-node (sort (::s/nodes causal-tree)))))
   ([causal-tree node] (weave causal-tree node nil))
-  ([causal-tree [id k v :as node] more-nodes]
-   (if (not (get-in causal-tree [::s/nodes id]))
-     causal-tree
-     (loop [left []
-            right (or (get-in causal-tree [::s/weave k]) [])]
-       (let [nr (first right)]
-         (if (or (empty? right)
-                 (<< (first nr) id))
-           (let [ct (assoc-in causal-tree [::s/weave k]
-                              (into left cat [[[id v]] right]))]
-             (if more-nodes (weave ct (first more-nodes) (next more-nodes)) ct))
-           (recur (conj left nr) (rest right))))))))
+  ([causal-tree [id cause v :as node] more-nodes]
+   (let [cause-is-id? (spec/valid? ::s/id cause)
+         key (if cause-is-id?
+               (first (get-in causal-tree [::s/nodes cause]))
+               cause)
+         cause-in-weave (if cause-is-id?
+                          cause
+                          s/root-id)] ; if the cause is not an id then it should be woven to the root-id
+     (if (not (get-in causal-tree [::s/nodes id]))
+       causal-tree
+       (let [key-weave (or (get-in causal-tree [::s/weave key]) [s/root-node])
+             key-weave (s/weave-node key-weave [id cause-in-weave v])
+             ; _ (println key-weave)
+             ct (assoc-in causal-tree [::s/weave key] key-weave)]
+         (if more-nodes
+           (weave ct (first more-nodes) (next more-nodes))
+           ct))))))
 
 (defn active-node
-  "Returns the active node for a given tuple of
-  [cause [[id value] [id value] ...]] i.e. a row in a weave.
+  "Returns the active node for a given tuple of a ::s/list-weave.
   Returns ::blank when the value is hidden."
-  [key-values-from-weave]
-  (let [[c [[id v] & more]] key-values-from-weave]
-    (cond
-      (= v ::s/hide) ::blank
-      (= v ::s/show) (loop [[[next-id next-v] & next-more] more]
-                       (if (s/special-keywords next-v)
-                         (recur next-more)
-                         [next-id c next-v]))
-      :else [id c v])))
+  [k [[root-id _ _] [_ _ first-v] :as weave-for-key]]
+  (if (= first-v ::s/hide)
+    ::blank
+    (loop [[[[id c v] [nr-id nr-c nr-v]] & more] (partition 2 1 [nil] (seq weave-for-key))]
+      (cond
+        (and (nil? id) (empty? more)) ::blank
+        (= s/root-id id) (recur more)
+        (s/special-keywords v) (recur more)
+        (= nr-v ::s/hide) (recur more)
+        :else [id k v]))))
 
 (defn get-
   ([causal-tree k]
-   (let [kvs [k (seq (get-in causal-tree [::s/weave k]))]
-         node (active-node kvs)]
+   (let [weave-for-key (get-in causal-tree [::s/weave k])
+         node (active-node k weave-for-key)]
      (when (not (= node ::blank))
        (peek node)))))
 
 (defn count- [causal-tree]
   (reduce-kv
-   (fn [acc k v] (if (= ::s/hide (peek (first v)))
-                   acc (inc acc)))
+   (fn [acc k weave-for-key]
+     (if (= ::blank (active-node k weave-for-key))
+       acc (inc acc)))
    0 (::s/weave causal-tree)))
 
 (defn assoc-
@@ -95,17 +98,17 @@
   will materialize as a map. This is mostly for testing and pretty
   printing. In most cases it's prefferable to work with the whole tree."
   [causal-tree opts]
-  (reduce (fn [acc kvs]
-            (let [node (active-node kvs)]
-              (if (= node ::blank) acc
-                  (assoc acc (second node) (s/causal->edn (last node) opts)))))
-          {} (::s/weave causal-tree)))
+  (reduce-kv (fn [acc k weave-for-key]
+               (let [node (active-node k weave-for-key)]
+                 (if (= node ::blank) acc
+                     (assoc acc (second node) (s/causal->edn (last node) opts)))))
+             {} (::s/weave causal-tree)))
 
 (defn causal-map->list [causal-tree]
-  (reduce (fn [acc kvs]
-            (let [node (active-node kvs)]
-              (if (= node ::blank) acc (conj acc node))))
-          '() (::s/weave causal-tree)))
+  (reduce-kv (fn [acc k weave-for-key]
+               (let [node (active-node k weave-for-key)]
+                 (if (= node ::blank) acc (conj acc node))))
+             '() (::s/weave causal-tree)))
 
 #? (:clj
     (deftype CausalMap [ct]

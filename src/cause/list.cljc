@@ -18,37 +18,6 @@
    ::s/yarns {(second (first s/root-node)) [s/root-node]}
    ::s/weave [s/root-node]})
 
-(defn weave-asap?
-  "Takes a left, a middle and a right node. Returns true if the middle
-  node should be inserted as soon as possible."
-  [nl nm nr]
-  (or
-   (= (first nl) (second nm)) ; Always try to weave a node after its cause.
-   (= (first nm) (second nr)))) ; Always try to weave a node before a node it causes.
-
-(defn weave-later?
-  "Takes a left, a middle and a right node. Returns true if the middle
-  node cannot be inserted between the left and the right for any reason.
-  This assumes that you already want to weave-asap?."
-  [nl nm nr seen]
-  (or
-   (and
-    (s/special-keywords (peek nr)) ; if the next node is a hide or a show
-    (not= (first nm) (second nr)) ; and it does not hide or show this node
-    (or (not (s/special-keywords (peek nm))) ; and this node is not also a hide or a show
-        (<< (first nm) (first nr)))) ; or if it is, but it is older, don't weave.
-   (and
-    (or (= (first nl) (second nr)) ; if the next node is caused by the previous node
-        (= (second nl) (second nr)) ; or if the next node shares a cause with the previous node
-        (get seen (second nr))) ; or the next node is caused by a seen node
-    (<< (first nm) (first nr)) ; and this node is older
-    (or (not (s/special-keywords (peek nm))) ; and this node is not a hide or a show
-        (s/special-keywords (peek nr)))) ; or the next node is a hide or a show, don't weave.
-   (and
-    (<< (first nm) (first nr)) ; if this node is older than the next
-    (or (not (s/special-keywords (peek nm))) ; and this node is not a hide or a show
-        (s/special-keywords (peek nr)))))) ; or the next node is a hide or a show, don't weave.
-
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
   If a node is passed only that node will be woven in O(n). If
@@ -62,20 +31,8 @@
   ([causal-tree node more-consecutive-nodes-in-same-tx]
    (if (not (get-in causal-tree [::s/nodes (first node)]))
      causal-tree
-     (loop [left []
-            right (::s/weave causal-tree)
-            prev-asap false
-            seen-since-asap {}]
-       (let [nl (peek left)
-             nr (first right)
-             asap (or prev-asap (weave-asap? nl node nr))]
-         (if (or (empty? right)
-                 (and asap (not (weave-later? nl node nr seen-since-asap))))
-           (assoc causal-tree ::s/weave (into left cat [[node] more-consecutive-nodes-in-same-tx right]))
-           (recur (conj left nr) (rest right) asap (if asap
-                                                     (assoc seen-since-asap
-                                                            (first nl) true)
-                                                     seen-since-asap))))))))
+     (->> (s/weave-node (::s/weave causal-tree) node more-consecutive-nodes-in-same-tx)
+          (assoc causal-tree ::s/weave)))))
 
 (defn conj-
   ([causal-tree v & vs]
