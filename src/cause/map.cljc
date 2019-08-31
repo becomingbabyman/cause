@@ -40,7 +40,6 @@
        causal-tree
        (let [key-weave (or (get-in causal-tree [::s/weave key]) [s/root-node])
              key-weave (s/weave-node key-weave [id cause-in-weave v])
-             ; _ (println key-weave)
              ct (assoc-in causal-tree [::s/weave key] key-weave)]
          (if more-nodes
            (weave ct (first more-nodes) (next more-nodes))

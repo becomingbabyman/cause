@@ -15,6 +15,7 @@
                     (java.util Date Collection)
                     (java.lang Object))))
 
+(spec/def ::path (spec/keys :req [::s/uuid ::s/type ::s/node]))
 (spec/def ::reverse-path (spec/tuple ::s/id ::s/uuid)) ; Starts with id to make sorting easier
 (spec/def ::history (spec/coll-of ::reverse-path ::gen-max 3)) ; Sorted log of all insertions
 (spec/def ::last-undo-lamport-ts ::s/lamport-ts) ; The most recently undone lamport-ts
@@ -253,7 +254,9 @@
     (if tx-part
       (let [[cb tx-index] (handle-tx-part cb tx-part tx-index)]
         (recur cb tx tx-index))
-      (update cb ::s/lamport-ts inc))))
+      (-> cb
+          (update ::s/lamport-ts inc)
+          (assoc ::s/last-undo-tx-id nil)))))
 ; TODO: retract whole collections
 ; TODO: retract contiguous chunks from [uuid1, id1] -> [uuid2, id2]
 ; TODO: normalize transaction / abort if can't normalize
@@ -274,106 +277,174 @@
 ; - scrub through timeline like a youtube video
 ; - reset to any point in time like `git reset`
 ; --- Functions ---
-; [] undo (last local tx-part)
-; [] redo (last local undo)
-; [] reset (to any tx-part in the history)
-;    Can this be the primary function that drives everything else?
-;    - [tx-part]
-;    - options [tx-part, [site-ids-to-undo...]]
-;    - allow different arities to pass in opitmizations?
+; [] invert
+;    This is the primary function that drives history manipulation.
+;    - [cb history]
+;      - map history into tx-parts
+;      - find tx-parts for collections were created (and are about to be retracted)
+;      - filter out tx-parts that belong these collections because
+;        those collections are about to be retracted and there's no
+;        reason to invert nested tx-parts in deleted collections.
+;      - invert remaining tx-parts
+;      - transact
+; [] undo (last local tx)
+;    - [cb] - local site-id undo
+;      - find the tx-id for the local site-id that comes before last-undo-tx-id
+;        and slice the ::history to get all reverse-paths for said tx-id
+;      - (invert [cb sliced-history])
+;      - set last-undo-tx-id to tx-id
+; [] redo (last local undo, if there is one...)
+;    - [cb] - local site-id redo
+;      - slice ::history to get last-undo-tx-id reverse-paths
+;      - (invert [cb sliced-history])
+;      - find the tx-id for the local site-id that comes after last-undo-tx-id
+;      - set last-undo-tx-id to tx-id
+; [] reset (to any tx in the history)
+;    - [cb tx-id] - handles git style reset and scrubbing
+;      - slice the ::history from tx-id to the end
+;      - (invert [cb sliced-history])
+;    - [cb tx-id #{site-id site-id ...}] - the backbone of undo / redo
+;      - slice ""
+;      - filter out the site-ids not passed in from the history slice
+;      - (invert [cb sliced-and-filtered-history])
 
-(defn get-history- [cb]
-  (::history cb))
+(defn expand-reverse-path
+  "Returns the `[node collection]` for a reverse-path"
+  [cb [id uuid]]
+  (let [collection (get-collection- cb uuid)
+        node (into [id] (get-in (.-ct collection) [::s/nodes id]))]
+    [node collection]))
 
-(defn find-nodes-in-tx-part
-  "Returns the nodes given the lamport-ts and site-id of a transaction."
-  [cb lamport-ts site-id]
-  (println "TODO"))
+(defn reverse-path->path [cb [id uuid]]
+  (let [[node collection] (expand-reverse-path cb [id uuid])]
+    {::s/uuid uuid
+     ::s/type (::s/type (.-ct collection))
+     ::s/node node}))
 
-(defn invert-nodes
-  "Generates invert nodes given a list of nodes."
-  [cb nodes]
-  (println "TODO"))
+(defn tx-id-indexes
+  "Returns `[tx-start-i tx-end-i]` of the reverse-paths
+  relating to a specific tx-id in the history."
+  [cb tx-id]
+  (if (nil? tx-id)
+    [nil nil]
+    (let [history (::history cb)
+          tx-start-node-id (into tx-id [0])
+          tx-start-i (u/binary-search history
+                                      tx-start-node-id
+                                      #(= (first %1) %2)
+                                      #(<< (first %1) %2))
+          tx-end-i (if (not (int? tx-start-i))
+                     nil
+                     (loop [i tx-start-i]
+                       (let [rp (nth history (inc i) nil)]
+                         (if (and rp (= tx-id (pop (first rp))))
+                           (recur (inc i))
+                           i))))]
+      [tx-start-i tx-end-i])))
 
-(defn invert-tx-part
-  "Generates invert tx given the lamport-ts and site-id of a transaction."
-  [cb lamport-ts site-id]
-  (println "TODO"))
+(defn subhis
+  "Returns a slice of history between start and end tx-ids inclusive.
+  The 2 arity form slices out a the history for a single tx-id.
+  Set start-tx-id to nil for the start and
+  set end-tx-id to nil for the end."
+  ([cb tx-id]
+   (subhis cb tx-id tx-id))
+  ([cb start-tx-id end-tx-id]
+   (let [history (::history cb)
+         [start-tx-i end-tx-i] (tx-id-indexes cb start-tx-id)
+         [_ end-tx-i] (if (= start-tx-id end-tx-id)
+                        [start-tx-i end-tx-i]
+                        (tx-id-indexes cb end-tx-id))]
+     (if (or (and (vector? start-tx-id) (nil? start-tx-i))
+             (and (vector? end-tx-id) (nil? end-tx-i)))
+       [] ; Return [] if start-tx-id or end-tx-id is not found in history
+       (if end-tx-i
+         (subvec history (or start-tx-i 0) (inc end-tx-i))
+         (subvec history (or start-tx-i 0)))))))
+
+(defn invert-path
+  "Generates an inverted tx-part given a path"
+  [{:keys [::s/uuid ::s/type] [id cause value] ::s/node}]
+  (case value
+    ::s/hide [uuid cause ::s/show]
+    ::s/show [uuid cause ::s/hide]
+    [uuid id ::s/hide]))
+
+; [] invert
+;    This is the primary function that drives history manipulation.
+;    - [cb history]
+;      - map history into tx-parts
+;      - find tx-parts for collections were created (and are about to be retracted)
+;      - filter out tx-parts that belong these collections because
+;        those collections are about to be retracted and there's no
+;        reason to invert nested tx-parts in deleted collections.
+;      - invert remaining tx-parts
+;      - transact
+(defn invert-
+  "Returns a causal-base with a slice of its history inverted. Attempts
+  to invert the supplied history with as few tx-parts as possible."
+  [cb history-to-invert]
+  (let [paths (map (partial reverse-path->path cb)
+                   ; reverse the history so the oldest changes get transacted last (will overried newer changes at the same cause)
+                   (reverse history-to-invert))
+        soon-to-be-hidden-uuids (->> paths
+                                     (filter (comp ref? peek ::s/node))
+                                     (map (comp ref->uuid peek ::s/node))
+                                     (set))
+        ; removing nested paths that are about to have their parent collection (uuid)
+        ; hidden cuts down on the size of the tx without changing the end result
+        not-nested-paths (filter (comp not soon-to-be-hidden-uuids ::s/uuid) paths)
+        tx (map invert-path not-nested-paths)
+        ; only keep the last tx-part for each [uuid cause] pair
+        tx (vals
+            (reduce
+             (fn [acc [uuid c :as tx-part]]
+               (assoc acc [uuid c] tx-part))
+             {} tx))]
+    (transact- cb tx)))
 
 (defn reset-
-  "Undoes all transactions going back to the provided site-id and lamport-ts"
-  [cb site-id lamport-ts]
-  (println "TODO"))
+  "Undoes all transactions going back to the provided tx-id"
+  ([cb tx-id]
+   (subhis cb tx-id nil))
+  ([cb tx-id site-ids]
+   (->> (subhis cb tx-id nil)
+        (filter (comp (set site-ids) second first))
+        (invert- cb))))
 
+(defn get-next-undo-tx-id
+  "Returns the tx-id that is next in line to be undone."
+  [cb]
+  (let [last-lamport-ts (::last-undo-lamport-ts cb)
+        remaining-history (if last-lamport-ts
+                            (subhis cb nil [(dec last-lamport-ts) (::s/site-id cb)])
+                            (::history cb))
+        next-lamport-ts (loop [remaining-history remaining-history]
+                          (if (empty? remaining-history)
+                            nil
+                            (let [[[lamport-ts site-id]] (peek remaining-history)]
+                              (if (= site-id (::s/site-id cb))
+                                lamport-ts
+                                (recur (pop remaining-history))))))]
+    (if next-lamport-ts
+      [next-lamport-ts (::s/site-id cb)]
+      nil)))
+
+; TODO: add an optional argument for steps. Some way to undo multiple
+;  txs at once, maybe something like a min-tx-parts. This way large
+;  txs can fill 1 undo on their own, but small txs will be grouped together.
+;  TODO: do the same for redo-
 (defn undo-
   "Returns a cb with the next transaction in the 'undo stack' undone."
-  ([cb]
-   (undo- cb (::s/site-id cb)))
-  ([cb site-id]
-   (let [history (::history cb)
-         last-undo-i (when (not (nil? (::last-undo-lamport-ts cb)))
-                       (u/binary-search history
-                                        [(::last-undo-lamport-ts cb) site-id 0]
-                                        #(= (first %1) %2)
-                                        #(<< (first %1) %2)))
-         history (if last-undo-i
-                   (loop [history (subvec history 0 last-undo-i)]
-                     (if (= (::last-undo-lamport-ts cb) (ffirst (peek history)))
-                       (recur (pop history))
-                       history))
-                   history)
-         reverse-paths (loop [lamport-ts nil
-                              history history
-                              reverse-paths []]
-                         (if (empty? history)
-                           reverse-paths
-                           (let [path (peek history)
-                                 path-sid (second (first path))]
-                             (cond
-                               (and lamport-ts
-                                    (or (not= lamport-ts (ffirst path))
-                                        (not= path-sid site-id))) reverse-paths
-                               (= path-sid site-id) (recur (ffirst path) (pop history) (conj reverse-paths path))
-                               :else (recur lamport-ts (pop history) reverse-paths)))))]
-     (undo- cb site-id reverse-paths)))
-  ([cb site-id reverse-paths]
-   (let [undo-tx (mapv (fn [[id uuid]]
-                         (let [causal (.ct (get-collection- cb uuid))
-                               [cause value] (get-in causal [::s/nodes id])]
-                           (case value
-                              ; TODO: undo should behave differently for maps vs lists.
-                              ;   lists can do this show / hide thing
-                              ;   maps need to look back in the weave of a given key pick the previous value...
-                              ;     Should map show / hide be reimplemented to make it more like lists??? Is that possible?
-                             ::s/hide [uuid cause ::s/show]
-                             ::s/show [uuid cause ::s/hide]
-                             [uuid
-                              (if (= (::s/type causal) ::s/map) cause id)
-                              ::s/hide])))
-                       reverse-paths)
-         cb (transact- cb undo-tx)]
-     (assoc cb ::last-undo-lamport-ts (first (ffirst reverse-paths))))))
-
-(comment
-  (do
-    (def cb (atom (new-cb)))
-    (swap! cb transact- [[nil nil {:a 1 :b 2}]])
-    (swap! cb transact- [[(::root-uuid @cb) :a 3]])
-    (get-history- @cb))
-  (:a (get-collection- @cb))
-  (swap! cb assoc ::last-undo-lamport-ts nil)
-  (.ct (get-collection- (undo- @cb)))
-  (seq (get-collection- (undo- @cb)))
-  (swap! cb undo-)
-  (:a (get-collection- @cb))
-  (do
-    (def cb (atom (new-cb)))
-    (swap! cb transact- [[nil nil [1]]])
-    (swap! cb transact- [[nil s/root-id 2]])
-    (deref cb)
-    (swap! cb transact- [[(::root-uuid @cb)]])
-    (get-history- @cb))
-  (swap! cb redo))
+  [cb]
+  (let [next-undo-tx-id (get-next-undo-tx-id cb)]
+    (if (nil? next-undo-tx-id)
+      cb
+      (let [tx (->> (subhis cb next-undo-tx-id)
+                    (filter (comp (partial = (::s/site-id cb)) second first)))]
+        (-> cb
+            (invert- tx)
+            (assoc ::last-undo-lamport-ts (first next-undo-tx-id)))))))
 
 (defn redo-
   "Undoes the most recent transaction that is not an redo performed by
