@@ -15,10 +15,14 @@
                     (java.util Date Collection)
                     (java.lang Object))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Schema ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (spec/def ::path (spec/keys :req [::s/uuid ::s/type ::s/node]))
 (spec/def ::reverse-path (spec/tuple ::s/id ::s/uuid)) ; Starts with id to make sorting easier
 (spec/def ::history (spec/coll-of ::reverse-path ::gen-max 3)) ; Sorted log of all insertions
+(spec/def ::first-undo-lamport-ts ::s/lamport-ts) ; The first lamport-ts on the current undo stack, redo should never go past this
 (spec/def ::last-undo-lamport-ts ::s/lamport-ts) ; The most recently undone lamport-ts
+(spec/def ::last-redo-lamport-ts ::s/lamport-ts) ; The most recently redone lamport-ts
 (spec/def ::root-uuid ::s/uuid)
 ; TODO: ::collections actually stores CausalTrees not ::s/causal-trees...
 (spec/def ::collections (spec/map-of ::s/uuid ::s/causal-tree :gen-max 3))
@@ -26,7 +30,9 @@
                                          ::s/lamport-ts
                                          ::s/site-id
                                          ::history
+                                         ::first-undo-lamport-ts
                                          ::last-undo-lamport-ts
+                                         ::last-redo-lamport-ts
                                          ::root-uuid
                                          ::collections]))
 ; TODO: add a 4th optional slot to the tx-part tuple for `::raw-value?`
@@ -44,9 +50,13 @@
    ::s/uuid (u/new-uid)
    ::s/site-id (s/new-site-id)
    ::history []
+   ::first-undo-lamport-ts nil
    ::last-undo-lamport-ts nil
+   ::last-redo-lamport-ts nil
    ::root-uuid nil
    ::collections {}})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def ref-ns "cause.base.ref")
 
@@ -89,6 +99,8 @@
     (new-cb)
     [[nil nil [:div {:foo "bar"} "wat"
                [:p "baz"]]]])))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Transact ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn new-node
   "Returns a new local node and an incremented tx-index `[tx-index node]`"
@@ -256,57 +268,15 @@
         (recur cb tx tx-index))
       (-> cb
           (update ::s/lamport-ts inc)
-          (assoc ::s/last-undo-tx-id nil)))))
+          (assoc ::first-undo-lamport-ts nil
+                 ::last-undo-lamport-ts nil
+                 ::last-redo-lamport-ts nil)))))
 ; TODO: retract whole collections
 ; TODO: retract contiguous chunks from [uuid1, id1] -> [uuid2, id2]
 ; TODO: normalize transaction / abort if can't normalize
 ;   Normalization is probably a fn or schema that gets passed to transact
 
-;;;;;;;;;
-
-; TODO: History Manipulation
-; Every operation must be addative, so an undo adds
-; an inverse transaction rather than deleting a transaction
-; --- Goals ---
-; - (re)construct history from immutable data stored in causal-trees
-; - simulate an undo stack
-; - simulate a redo stack
-; - infinite undo back to first tx-part
-; - show history / changelog
-; - show blame, who made which tx
-; - scrub through timeline like a youtube video
-; - reset to any point in time like `git reset`
-; --- Functions ---
-; [] invert
-;    This is the primary function that drives history manipulation.
-;    - [cb history]
-;      - map history into tx-parts
-;      - find tx-parts for collections were created (and are about to be retracted)
-;      - filter out tx-parts that belong these collections because
-;        those collections are about to be retracted and there's no
-;        reason to invert nested tx-parts in deleted collections.
-;      - invert remaining tx-parts
-;      - transact
-; [] undo (last local tx)
-;    - [cb] - local site-id undo
-;      - find the tx-id for the local site-id that comes before last-undo-tx-id
-;        and slice the ::history to get all reverse-paths for said tx-id
-;      - (invert [cb sliced-history])
-;      - set last-undo-tx-id to tx-id
-; [] redo (last local undo, if there is one...)
-;    - [cb] - local site-id redo
-;      - slice ::history to get last-undo-tx-id reverse-paths
-;      - (invert [cb sliced-history])
-;      - find the tx-id for the local site-id that comes after last-undo-tx-id
-;      - set last-undo-tx-id to tx-id
-; [] reset (to any tx in the history)
-;    - [cb tx-id] - handles git style reset and scrubbing
-;      - slice the ::history from tx-id to the end
-;      - (invert [cb sliced-history])
-;    - [cb tx-id #{site-id site-id ...}] - the backbone of undo / redo
-;      - slice ""
-;      - filter out the site-ids not passed in from the history slice
-;      - (invert [cb sliced-and-filtered-history])
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; History ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn expand-reverse-path
   "Returns the `[node collection]` for a reverse-path"
@@ -370,16 +340,6 @@
     ::s/show [uuid cause ::s/hide]
     [uuid id ::s/hide]))
 
-; [] invert
-;    This is the primary function that drives history manipulation.
-;    - [cb history]
-;      - map history into tx-parts
-;      - find tx-parts for collections were created (and are about to be retracted)
-;      - filter out tx-parts that belong these collections because
-;        those collections are about to be retracted and there's no
-;        reason to invert nested tx-parts in deleted collections.
-;      - invert remaining tx-parts
-;      - transact
 (defn invert-
   "Returns a causal-base with a slice of its history inverted. Attempts
   to invert the supplied history with as few tx-parts as possible."
@@ -391,7 +351,7 @@
                                      (filter (comp ref? peek ::s/node))
                                      (map (comp ref->uuid peek ::s/node))
                                      (set))
-        ; removing nested paths that are about to have their parent collection (uuid)
+        ; remove nested paths that are about to have their parent collection (uuid)
         ; hidden cuts down on the size of the tx without changing the end result
         not-nested-paths (filter (comp not soon-to-be-hidden-uuids ::s/uuid) paths)
         tx (map invert-path not-nested-paths)
@@ -412,12 +372,11 @@
         (filter (comp (set site-ids) second first))
         (invert- cb))))
 
-(defn get-next-undo-tx-id
-  "Returns the tx-id that is next in line to be undone."
-  [cb]
-  (let [last-lamport-ts (::last-undo-lamport-ts cb)
-        remaining-history (if last-lamport-ts
-                            (subhis cb nil [(dec last-lamport-ts) (::s/site-id cb)])
+(defn get-next-tx-id
+  "Returns the tx-id that is next in line to be undone or redone."
+  [cb last-undo-or-redo-ts]
+  (let [remaining-history (if last-undo-or-redo-ts
+                            (subhis cb nil [(dec last-undo-or-redo-ts) (::s/site-id cb)])
                             (::history cb))
         next-lamport-ts (loop [remaining-history remaining-history]
                           (if (empty? remaining-history)
@@ -437,24 +396,42 @@
 (defn undo-
   "Returns a cb with the next transaction in the 'undo stack' undone."
   [cb]
-  (let [next-undo-tx-id (get-next-undo-tx-id cb)]
+  (let [next-undo-tx-id (get-next-tx-id cb (::last-undo-lamport-ts cb))]
     (if (nil? next-undo-tx-id)
       cb
-      (let [tx (->> (subhis cb next-undo-tx-id)
-                    (filter (comp (partial = (::s/site-id cb)) second first)))]
+      (let [reverse-paths (->> (subhis cb next-undo-tx-id)
+                               (filter (comp (partial = (::s/site-id cb)) second first)))
+            first-undo-lamport-ts (if (::first-undo-lamport-ts cb)
+                                    (::first-undo-lamport-ts cb)
+                                    (first next-undo-tx-id))]
         (-> cb
-            (invert- tx)
-            (assoc ::last-undo-lamport-ts (first next-undo-tx-id)))))))
+            (invert- reverse-paths)
+            (assoc ::first-undo-lamport-ts first-undo-lamport-ts
+                   ::last-undo-lamport-ts (first next-undo-tx-id)
+                   ::last-redo-lamport-ts nil))))))
 
 (defn redo-
-  "Undoes the most recent transaction that is not an redo performed by
-  the provided site-id"
-  ([cb]
-   (redo- cb (::s/site-id cb)))
-  ([cb site-id]
-   (println "TODO")))
+  "Returns a cb with the previous transacrtion in the 'undo stack' undone"
+  [cb]
+  (let [next-redo-tx-id (get-next-tx-id cb (::last-redo-lamport-ts cb))
+        next-redo-lamport-ts (first next-redo-tx-id)
+        first-undo-lamport-ts (::first-undo-lamport-ts cb)
+        last-undo-lamport-ts (::last-undo-lamport-ts cb)]
+    (if (or (nil? first-undo-lamport-ts)
+            (nil? next-redo-tx-id)
+            (<= next-redo-lamport-ts first-undo-lamport-ts)) ; do not allow redoing past the first undo step
+      cb
+      (let [reverse-paths (->> (subhis cb next-redo-tx-id)
+                               (filter (comp (partial = (::s/site-id cb)) second first)))]
+        (-> cb
+            (invert- reverse-paths)
+            (assoc ::first-undo-lamport-ts first-undo-lamport-ts
+                   ::last-undo-lamport-ts last-undo-lamport-ts
+                   ::last-redo-lamport-ts next-redo-lamport-ts))))))
 
 ; (defn log- [cb & site-id] (println "TODO"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; CausalBase ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #? (:clj
     (deftype CausalBase [cb])
@@ -496,39 +473,3 @@
   "Creates a new causal base."
   []
   (CausalBase. (new-cb)))
-
-(comment
-  (def cb (new-cb))
-  (transact- cb [[nil s/root-id [1 2 3 {:a 1}]]])
-  (transact- cb [[nil nil [1 2 3 {:a 1}]]])
-  (transact- cb [[nil nil {:a 1 :b {:c :d}}]])
-  (transact- cb [[nil nil [:div "hey"
-                           [:p "these chars should be in the same list as :p"]]]])
-
-  (def acbm (atom (new-cb)))
-  (swap! acbm transact [[nil nil {:a 1 :b {:c :d}}]])
-  (transact- @acbm [[(::root-uuid @acbm) :a 3]])
-  (transact- @acbm [[(::root-uuid @acbm) :a "weee"]])
-  (transact- @acbm [[(::root-uuid @acbm) :a {:ee 3 :ff [1 2 3]}]])
-
-  (def acbl (atom (new-cb)))
-  (swap! acbl transact- [[nil nil [1 2 3]]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id 4]
-                    [(::root-uuid @acbl) s/root-id 5]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id "hey"]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id ["hey"]]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id [["hey"]]]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id ["hey" "sup"]]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id [[:div "hey"]]]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id [-3 -2 -1 0]]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id {:a 1}]])
-  ;
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿"]])
-  (transact- @acbl [[(::root-uuid @acbl) s/root-id "🤟🏿" true]]) ; TODO: add a 4th raw-value? slot to tx-part
-
-  (proto/get-collection (new-causal-base) nil)
-  (def cb (proto/transact (new-causal-base) [[nil nil [:div {:a 1} "foo" [:span "bar"]]]]))
-  (seq (get-collection- (.-cb cb) (peek (second (seq cb)))))
-  (seq (proto/get-collection cb (peek (second (seq cb)))))
-  (seq cb :cause.base.ref/OysqODJodVrFe5l5rxNx9)
-  (proto/causal->edn (proto/transact (new-causal-base) [[nil nil [:div {:a 1} "foo" [:span "bar"]]]])))

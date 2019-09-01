@@ -36,6 +36,9 @@
       (is (= [\h \i 1 2] (b/cb->edn (b/transact- cb [[(::b/root-uuid cb) c/root-id ["hi"]]]))))
       (is (= [[\h \i] 1 2] (b/cb->edn (b/transact- cb [[(::b/root-uuid cb) c/root-id [["hi"]]]])))))))
 
+; (deftest test-transacting-utf8-characters
+;   (transact- (new-cb) [[nil nil ["🤟🏿"]]]))
+
 (deftest test-CausalBase
   (is (= 0 (count (c/get-collection (c/new-causal-base)))))
   (is (= nil (seq (c/get-collection (c/new-causal-base)))))
@@ -106,31 +109,59 @@
   (is (nil? (:a (b/get-collection- @cb))))
   (is (= 13 (count (::b/history @cb)))))
 
-(deftest test-get-next-undo-tx-id
+(deftest test-get-next-tx-id
   (def cb (atom (b/new-cb)))
   (swap! cb b/transact- [[nil nil {:a 1 :b 2}]])
   (swap! cb b/transact- [[(::b/root-uuid @cb) :a 3]])
-  (is (= 2 (first (b/get-next-undo-tx-id @cb))))
+  (is (= 2 (first (b/get-next-tx-id @cb (::b/last-undo-lamport-ts @cb)))))
   (swap! cb assoc ::b/last-undo-lamport-ts 2)
-  (is (= 1 (first (b/get-next-undo-tx-id @cb))))
+  (is (= 1 (first (b/get-next-tx-id @cb (::b/last-undo-lamport-ts @cb)))))
   (swap! cb assoc ::b/last-undo-lamport-ts 1)
-  (is (nil? (b/get-next-undo-tx-id @cb)))
+  (is (nil? (b/get-next-tx-id @cb (::b/last-undo-lamport-ts @cb))))
   (swap! cb assoc ::b/last-undo-lamport-ts nil)
-  (is (= 2 (first (b/get-next-undo-tx-id @cb)))))
+  (is (= 2 (first (b/get-next-tx-id @cb (::b/last-undo-lamport-ts @cb))))))
 
-(deftest test-undo-
-  (def cb (atom (b/new-cb)))
-  (swap! cb b/transact- [[nil nil {:a 1 :b 2}]])
-  (swap! cb b/transact- [[(::b/root-uuid @cb) :a 3]])
-  ; (seq (b/get-collection- (b/undo- @cb)))
-  (is (= 3 (:a (b/get-collection- @cb))))
-  (is (= 2 (:b (b/get-collection- @cb))))
-  (swap! cb b/undo-)
-  (is (= 1 (:a (b/get-collection- @cb))))
-  (is (= 2 (:b (b/get-collection- @cb))))
-  (swap! cb b/undo-)
-  (is (nil? (:a (b/get-collection- @cb))))
-  (is (nil? (:b (b/get-collection- @cb)))))
+(deftest test-undo-and-redo-
+  (testing "undo in a map"
+    (def cb (atom (b/new-cb)))
+    (swap! cb b/transact- [[nil nil {:a 1 :b 2}]])
+    (swap! cb b/transact- [[(::b/root-uuid @cb) :a 3]])
+    (is (= 3 (:a (b/get-collection- @cb))))
+    (is (= 2 (:b (b/get-collection- @cb))))
+    (swap! cb b/undo-)
+    (is (= 1 (:a (b/get-collection- @cb))))
+    (is (= 2 (:b (b/get-collection- @cb))))
+    (swap! cb b/undo-)
+    (is (nil? (:a (b/get-collection- @cb))))
+    (is (nil? (:b (b/get-collection- @cb)))))
+  (testing "redo in a map"
+    (swap! cb b/redo-)
+    (is (= 1 (:a (b/get-collection- @cb))))
+    (is (= 2 (:b (b/get-collection- @cb))))
+    (swap! cb b/redo-)
+    (is (= 3 (:a (b/get-collection- @cb))))
+    (is (= 2 (:b (b/get-collection- @cb)))))
+  (testing "undo in a list"
+    (def cb (atom (b/new-cb)))
+    (swap! cb b/transact- [[nil nil [1]]])
+    (swap! cb b/transact- [[(::b/root-uuid @cb) c/root-id [2]]])
+    (swap! cb b/transact- [[(::b/root-uuid @cb) c/root-id [3]]])
+    (is (= 3 (peek (first (b/get-collection- @cb)))))
+    (swap! cb b/undo-)
+    (is (= 2 (peek (first (b/get-collection- @cb)))))
+    (swap! cb b/undo-)
+    (is (= 1 (peek (first (b/get-collection- @cb)))))
+    (swap! cb b/undo-)
+    (is (nil? (peek (first (b/get-collection- @cb))))))
+  (testing "redo in a list"
+    (swap! cb b/redo-)
+    (is (= 1 (peek (first (b/get-collection- @cb)))))
+    (swap! cb b/redo-)
+    (is (= 2 (peek (first (b/get-collection- @cb)))))
+    (swap! cb b/redo-)
+    (is (= 3 (peek (first (b/get-collection- @cb)))))
+    (swap! cb b/redo-)
+    (is (= 3 (peek (first (b/get-collection- @cb)))))))
 
 (comment
   (do
@@ -143,5 +174,5 @@
     (test-subhis)
     (test-invert-path)
     (test-invert-)
-    (test-get-next-undo-tx-id)
-    (test-undo-)))
+    (test-get-next-tx-id)
+    (test-undo-and-redo-)))

@@ -24,7 +24,7 @@ This is what Cause strives to do:
 
 4. **Idiomatic EDN.** The higher level causal data structures that are built from `nodes` implement many of the same protocols as their EDN counterparts. Most Clojure functions should just work on CausalLists and CausalMaps the same way they'd work on lists and maps.
 
-5. **Extended EDN.** Causal collections have some properties that don't fit into existing Clojure collection protocols, specifically identity and history that can span multiple interrelated collections. Facilities should be provided to manage these database-like properties efficiently and easily.
+5. **Extended EDN.** Causal collections have some properties that don't fit into existing Clojure collection protocols, specifically identity and history that can span multiple interrelated collections. These database-like properties can efficiently and easily be managed with a CausalBase.
 
 ## How it Works
 
@@ -86,7 +86,7 @@ On the other hand, `seq` and functions related to seq like `first, last, next, r
 
 **Gotchas:**
 
-- All causal collections act like their EDN equivalent collection around Clojure collection functions. This means they only reveal active values. E.g. if a key is `dissoc`'d from a causal-map you will not be able to `get` it even though it does still exist in the underlying causal data structure.
+- All causal collections act like their EDN equivalent collection around Clojure collection functions. This means they only reveal active values. E.g. if a key is `dissoc`'d from a causal-map you will not be able to `get` it even though it does still exist in the underlying causal data structure and is only hidden with a tombstone.
 
 ### History / Change Tracking / Version Control
 
@@ -133,11 +133,13 @@ Causal collections will automatically track the order values are inserted into t
 - [x] ƛ EDN -> Causal transformation function
 - [x] 🥞 Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
   - [x] Transactions should also weave contiguous sequences in O(n+m) instead of the current O(n*m), where n is all woven nodes and m is nodes in the transaction.
-- [ ] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal tree data type.
+- [ ] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal base data type.
+  - [ ] Add new history specific special-keywords to distinguish between time travel operations and generic `hide` tombstones
 - [x] ⫷ Nested collection helper functions
   - [x] Shared lamport-ts between collections
   - [x] Transacting across multiple collections
   - [x] History across multiple collections
+  - [ ] Share site-ids between nested collections for easier blame tracking
 - [ ] 👋 Improved merge / sync functions. Particularly ways to conveniently sync E2E over a distributed p2p network. Add examples using common packages that support (WebSockets, WebWorkers and WebRTC). Helper functions to make the integration simpler.
   - [ ] Also make some decisions around chattiness and ideal distributed network topologies. Hopefully this can be in the form of a recommended library, but some of the decisions might be specific to distributing a causal tree across many clients
 - [ ] ✅ Generative property based E2E tests with nested collections that share history
