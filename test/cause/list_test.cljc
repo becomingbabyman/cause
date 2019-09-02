@@ -7,7 +7,7 @@
             #? (:clj [criterium.core :refer [quick-bench]])))
 
 (def simple-values
-  (concat [c/hide c/hide c/hide c/show c/show \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
+  (concat [c/hide c/hide ::s/h.hide ::s/h.hide :s/h.show :s/h.show \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
 
 ; (def site-ids [0 1 2])
 (def site-ids [(s/new-site-id) (s/new-site-id) (s/new-site-id) (s/new-site-id) (s/new-site-id)])
@@ -165,11 +165,11 @@ respecting it." #" "))
     (is (= '("a" "b" "c") (c/causal->edn @cl)))
     (swap! cl c/append (first a-node) c/hide)
     (is (= '("b" "c") (c/causal->edn @cl)))
-    (swap! cl c/append (first a-node) c/show)
+    (swap! cl c/append (first a-node) ::s/h.show)
     (is (= '("a" "b" "c") (c/causal->edn @cl)))
     (swap! cl c/append (first a-node) c/hide)
     (is (= '("b" "c") (c/causal->edn @cl)))
-    (swap! cl c/append (first a-node) c/show)
+    (swap! cl c/append (first a-node) ::s/h.show)
     (is (= '("a" "b" "c") (c/causal->edn @cl)))))
 
 (deftest core-cljc-list-protocol-test
@@ -182,14 +182,14 @@ respecting it." #" "))
   (let [ct (c/new-causal-list :foo)
         n (first ct)]
     (is (not (empty? (-> (c/append ct (first n) c/hide)
-                         (c/append (first n) c/show))))))
+                         (c/append (first n) ::s/h.show))))))
   (is (= 0 (count (c/new-causal-list))))
   (is (= 1 (count (c/new-causal-list :foo))))
   (is (= 0 (count (-> (c/new-causal-list :foo) (conj c/hide)))))
   (let [ct (c/new-causal-list :foo)
         n (first ct)]
     (is (= 1 (count (-> (c/append ct (first n) c/hide)
-                        (c/append (first n) c/show))))))
+                        (c/append (first n) ::s/h.show))))))
   (let [node [[1 "site-id" 0] s/root-id :foo]]
     (is (= (list node) (seq (-> (c/new-causal-list) (c/insert node)))))
     (is (= node (first (-> (c/new-causal-list) (c/insert node)))))
@@ -224,5 +224,5 @@ respecting it." #" "))
   (def cl2 (atom (c/new-causal-list)))
   (time (do (doall (repeatedly 5 #(swap! cl2 insert-rand-node))) nil))
   (swap! cl2 c/append (first (second (c/get-weave @cl2))) c/hide)
-  (swap! cl2 c/append (first (second (c/get-weave @cl2))) c/show)
+  (swap! cl2 c/append (first (second (c/get-weave @cl2))) ::s/h.show)
   (c/causal->edn @cl2))

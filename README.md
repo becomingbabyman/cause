@@ -133,8 +133,8 @@ Causal collections will automatically track the order values are inserted into t
 - [x] ƛ EDN -> Causal transformation function
 - [x] 🥞 Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
   - [x] Transactions should also weave contiguous sequences in O(n+m) instead of the current O(n*m), where n is all woven nodes and m is nodes in the transaction.
-- [ ] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal base data type.
-  - [ ] Add new history specific special-keywords to distinguish between time travel operations and generic `hide` tombstones
+- [x] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal base data type.
+  - [x] Add new history specific special-keywords to distinguish between time travel operations and generic `hide` tombstones
 - [x] ⫷ Nested collection helper functions
   - [x] Shared lamport-ts between collections
   - [x] Transacting across multiple collections

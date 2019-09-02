@@ -1,5 +1,6 @@
 (ns cause.map-test
   (:require [cause.core :as c]
+            [cause.shared :as s]
             [clojure.string :as string]
             [clojure.test :refer [deftest testing is]]))
 
@@ -20,15 +21,15 @@
     (is (= {:foo "bar" :fizz "buzz"} (c/causal->edn @ct)))
     (swap! ct c/append :foo c/hide)
     (is (= {:fizz "buzz"} (c/causal->edn @ct)))
-    (swap! ct c/append :foo c/show)
+    (swap! ct c/append :foo ::s/h.show)
     (is (= {:foo "bar" :fizz "buzz"} (c/causal->edn @ct)))
     (swap! ct c/append :foo c/hide)
     (is (= {:fizz "buzz"} (c/causal->edn @ct)))
-    (swap! ct c/append :foo c/show)
+    (swap! ct c/append :foo ::s/h.show)
     (is (= {:foo "bar" :fizz "buzz"} (c/causal->edn @ct)))
     (swap! ct c/append :foo "boo")
-    (swap! ct c/append :foo c/show)
-    (swap! ct c/append :foo c/show)
+    (swap! ct c/append :foo ::s/h.show)
+    (swap! ct c/append :foo ::s/h.show)
     (is (= {:foo "boo" :fizz "buzz"} (c/causal->edn @ct)))))
 
 (deftest hide-and-show-by-node-id
@@ -40,7 +41,7 @@
       (let [boo-id (ffirst (seq @ct))]
         (swap! ct c/append boo-id c/hide)
         (is (= {:foo "bar"} (c/causal->edn @ct)))
-        (swap! ct c/append boo-id c/show)
+        (swap! ct c/append boo-id ::s/h.show)
         (is (= {:foo "boo"} (c/causal->edn @ct)))))))
 
 (deftest core-cljc-map-protocol-test
@@ -51,7 +52,7 @@
   (is (empty? (c/new-causal-map)))
   (is (not (empty? (c/new-causal-map :foo "bar"))))
   (is (empty? (-> (c/new-causal-map :foo "bar") (dissoc :foo))))
-  (is (not (empty? (-> (c/new-causal-map :foo "bar") (dissoc :foo) (assoc :foo c/show)))))
+  (is (not (empty? (-> (c/new-causal-map :foo "bar") (dissoc :foo) (assoc :foo ::s/h.show)))))
   (is (= "bar" (:foo (c/new-causal-map :foo "bar"))))
   (is (= "bar" (get (c/new-causal-map :foo "bar") :foo)))
   (is (= "bar" (get-in (c/new-causal-map :foo (c/new-causal-map :foo "bar")) [:foo :foo])))
@@ -66,7 +67,7 @@
   (is (= 0 (count (c/new-causal-map))))
   (is (= 1 (count (c/new-causal-map :foo "bar"))))
   (is (= 0 (count (-> (c/new-causal-map :foo "bar") (dissoc :foo)))))
-  (is (= 1 (count (-> (c/new-causal-map :foo "bar") (dissoc :foo) (assoc :foo c/show)))))
+  (is (= 1 (count (-> (c/new-causal-map :foo "bar") (dissoc :foo) (assoc :foo ::s/h.show)))))
   (let [node [[1 "site-id" 0] :fizz "buzz"]]
     (is (= node (first (-> (c/new-causal-map) (c/insert node)))))
     (is (= node (last (-> (c/new-causal-map) (c/insert node)))))
@@ -86,7 +87,7 @@
   (is (= "bar"
          (-> (c/new-causal-map :foo "bar")
              (dissoc :foo)
-             (assoc :foo c/show)
+             (assoc :foo ::s/h.show)
              (get :foo)))))
 
 (comment

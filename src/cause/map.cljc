@@ -49,14 +49,14 @@
   "Returns the active node for a given tuple of a ::s/list-weave.
   Returns ::blank when the value is hidden."
   [k [[root-id _ _] [_ _ first-v] :as weave-for-key]]
-  (if (= first-v ::s/hide)
+  (if (or (= first-v ::s/hide) (= first-v ::s/h.hide))
     ::blank
     (loop [[[[id c v] [nr-id nr-c nr-v]] & more] (partition 2 1 [nil] (seq weave-for-key))]
       (cond
         (and (nil? id) (empty? more)) ::blank
         (= s/root-id id) (recur more)
         (s/special-keywords v) (recur more)
-        (= nr-v ::s/hide) (recur more)
+        (or (= nr-v ::s/hide) (= nr-v ::s/h.hide)) (recur more)
         :else [id k v]))))
 
 (defn get-

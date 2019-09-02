@@ -18,7 +18,7 @@
 ; Follow up paper (more detailed impl): https://www.dropbox.com/spec/6go311vjfqhgd6f/Deep_hypertext_with_embedded_revision_co.pdf?dl=0
 
 (def types #{::map ::list}) ; ::rope ::counter
-(def special-keywords #{::hide ::show})
+(def special-keywords #{::hide ::h.hide ::h.show}) ; h- prefixes internal history hide/show
 (def root-id [0 "0" 0])
 (def root-node [root-id nil nil])
 (def ^:const uuid-length 21)

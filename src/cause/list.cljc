@@ -50,7 +50,8 @@
   "Is this node hidden when the weave is rendered"
   [node next-node-in-weave]
   (or (s/special-keywords (peek node))
-      (and (= ::s/hide (peek next-node-in-weave))
+      (and (or (= ::s/hide (peek next-node-in-weave))
+               (= ::s/h.hide (peek next-node-in-weave)))
            (= (first node) (second next-node-in-weave)))
       (= s/root-node node)))
 

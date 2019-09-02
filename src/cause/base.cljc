@@ -314,9 +314,10 @@
   "Generates an inverted tx-part given a path"
   [{:keys [::s/uuid ::s/type] [id cause value] ::s/node}]
   (case value
-    ::s/hide [uuid cause ::s/show]
-    ::s/show [uuid cause ::s/hide]
-    [uuid id ::s/hide]))
+    ::s/hide [uuid cause ::s/h.show]
+    ::s/h.hide [uuid cause ::s/h.show]
+    ::s/h.show [uuid cause ::s/h.hide]
+    [uuid id ::s/h.hide]))
 
 (defn invert-
   "Returns a causal-base with a slice of its history inverted. Attempts

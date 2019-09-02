@@ -133,7 +133,7 @@
   (is (= 0 (count (b/subhis @cb [5 (::s/site-id @cb)] nil)))))
 
 (deftest test-invert-path
-  (is (= ["yVqwAa8ypPGRC_p3wdKhS" [1 "QeVBlHoQFZSx0" 0] :cause.shared/hide]
+  (is (= ["yVqwAa8ypPGRC_p3wdKhS" [1 "QeVBlHoQFZSx0" 0] :cause.shared/h.hide]
          (b/invert-path
           {::s/uuid "yVqwAa8ypPGRC_p3wdKhS"
            ::s/type ::s/map

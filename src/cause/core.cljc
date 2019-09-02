@@ -11,13 +11,7 @@
 ; Special values have special effects on causal collections.
 ; NOTE: Special values do not compose with one another.
 ;       E.g. applying hide to a hide will not equal show.
-; TODO: MAYBE: RENAME: hide to retract
-; TODO: MAYBE: RENAME: show to reveal
-; TODO: MAYBE: DELETE: delete
 (def ^{:doc "Insert this value to hide a cause."} hide ::s/hide)
-(def ^{:doc "An alias for hide."} delete ::s/hide)
-(def ^{:doc "If a cause is hidden, insert this value to show
-            it again."} show ::s/show)
 (def ^{:doc "The id of the first node in every causal-list. To insert
              a node at the front, set root-id as the cause."}
   root-id s/root-id)
