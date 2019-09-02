@@ -139,7 +139,7 @@ Causal collections will automatically track the order values are inserted into t
   - [x] Shared lamport-ts between collections
   - [x] Transacting across multiple collections
   - [x] History across multiple collections
-  - [ ] Share site-ids between nested collections for easier blame tracking
+  - [x] Share site-ids between nested collections for easier blame tracking
 - [ ] 👋 Improved merge / sync functions. Particularly ways to conveniently sync E2E over a distributed p2p network. Add examples using common packages that support (WebSockets, WebWorkers and WebRTC). Helper functions to make the integration simpler.
   - [ ] Also make some decisions around chattiness and ideal distributed network topologies. Hopefully this can be in the form of a recommended library, but some of the decisions might be specific to distributing a causal tree across many clients
 - [ ] ✅ Generative property based E2E tests with nested collections that share history
