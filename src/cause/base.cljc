@@ -93,12 +93,6 @@
   ([cb opts]
    (let [causal (get-collection- cb)]
      (s/causal->edn causal (merge opts {:cb cb})))))
-(comment
-  (cb->edn
-   (transact-
-    (new-cb)
-    [[nil nil [:div {:foo "bar"} "wat"
-               [:p "baz"]]]])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Transact ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -141,8 +135,6 @@
                  [cb tx-index (conj nodes node)]))
              [cb tx-index []]
              map-value))
-(comment
-  (map->nodes (new-cb) 0 {:a 1 :b 2}))
 
 (defn list->nodes
   "Returns `[cb tx-index nodes last-node-id]`"
@@ -161,10 +153,6 @@
                    [cb tx-index (conj nodes node) (first node)])))
              [cb tx-index [] (or cause s/root-id)]
              value))))
-(comment
-  (list->nodes (new-cb) 0 [1 2 3])
-  (list->nodes (new-cb) 0 "abc")
-  (list->nodes (new-cb) 0 "🤟🏿wat"))
 
 (defn flatten-collection
   [cb tx-index value node-fn]
@@ -181,16 +169,6 @@
     (map? value) (flatten-collection cb tx-index value map->nodes)
     (seqable? value) (flatten-collection cb tx-index value list->nodes)
     :else [cb tx-index value]))
-(comment
-  ; map
-  (flatten-value (new-cb) 0 {:a {:aa 1 :bb 2 :cc 3}})
-  (flatten-value (new-cb) 0 {:a {:b {:c :d}}})
-  ; list
-  (flatten-value (new-cb) 0 [1 [2 [3]]])
-  (flatten-value (new-cb) 0 [1 "hello" "world"])
-  ; combo
-  (flatten-value (new-cb) 0 [:div {:title "don't break"}
-                             [:span "break"]]))
 
 (defn value->nodes
   "Returns `[cb tx-index nodes]`"

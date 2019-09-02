@@ -13,6 +13,48 @@
            [[nil nil [:div {:foo "bar"} "wat"
                       [:p "baz"]]]])))))
 
+(deftest test-map->nodes
+  (let [cb (b/new-cb)
+        [_ tx-index nodes] (b/map->nodes cb 0 {:a 1 :b 2})]
+    (is (= 2 tx-index))
+    (is (= nodes [[[1 (::s/site-id cb) 0] :a 1]
+                  [[1 (::s/site-id cb) 1] :b 2]]))))
+(deftest test-list->nodes
+  (let [[cb tx-index nodes last-node-id] (b/list->nodes (b/new-cb) 0 [1 2 3])]
+    (is (= 3 tx-index))
+    (is (= nodes [[[1 (::s/site-id cb) 0] [0 "0" 0] 1]
+                  [[1 (::s/site-id cb) 1] [1 (::s/site-id cb) 0] 2]
+                  [[1 (::s/site-id cb) 2] [1 (::s/site-id cb) 1] 3]]))
+    (is (= last-node-id [1 (::s/site-id cb) 2]))))
+  ; (list->nodes (new-cb) 0 "abc")
+  ; (list->nodes (new-cb) 0 "🤟🏿wat"))
+
+(deftest test-flatten-value
+  (testing "map"
+    (let [[cb tx-i c-ref] (b/flatten-value (b/new-cb) 0 {:a {:aa 1 :bb 2 :cc 3}})]
+      (is (= 4 tx-i))
+      (is (b/ref? c-ref))
+      (is (= 2 (count (::b/collections cb)))))
+    (let [[cb tx-i c-ref] (b/flatten-value (b/new-cb) 0 {:a {:b {:c :d}}})]
+      (is (= 3 tx-i))
+      (is (b/ref? c-ref))
+      (is (= 3 (count (::b/collections cb))))))
+  (testing "list"
+    (let [[cb tx-i c-ref] (b/flatten-value (b/new-cb) 0 [1 [2 [3]]])]
+      (is (= 5 tx-i))
+      (is (b/ref? c-ref))
+      (is (= 3 (count (::b/collections cb)))))
+    (let [[cb tx-i c-ref] (b/flatten-value (b/new-cb) 0 [1 "hello" "world"])]
+      (is (= 11 tx-i))
+      (is (b/ref? c-ref))
+      (is (= 1 (count (::b/collections cb))))))
+  (testing "combo"
+    (let [[cb tx-i c-ref] (b/flatten-value (b/new-cb) 0 [:div {:title "don't break"}
+                                                         [:span "break"]])]
+      (is (= 10 tx-i))
+      (is (b/ref? c-ref))
+      (is (= 3 (count (::b/collections cb)))))))
+
 (deftest test-transact
   (let [cb (b/new-cb)]
     (testing "new causal base")
@@ -166,6 +208,9 @@
 (comment
   (do
     (test-cb->edn)
+    (test-map->nodes)
+    (test-list->nodes)
+    (test-flatten-value)
     (test-transact)
     (test-CausalBase)
     (test-expand-reverse-path)
