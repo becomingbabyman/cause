@@ -437,6 +437,8 @@
   (get-collection
     ([this] (get-collection- (.-cb this)))
     ([this ref-or-uuid] (get-collection- (.-cb this) ref-or-uuid)))
+  (undo [this] (CausalBase. (undo- (.-cb this))))
+  (redo [this] (CausalBase. (redo- (.-cb this))))
 
   proto/CausalMeta
   (get-uuid [this] (::s/uuid (.-cb this)))

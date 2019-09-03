@@ -19,6 +19,8 @@
 ; Causal base. This is what you want 99% of the time.
 (redef new-causal-base c.base/new-causal-base)
 (redef transact proto/transact)
+(redef undo proto/undo)
+(redef redo proto/redo)
 (redef ref? c.base/ref?)
 (redef uuid->ref c.base/uuid->ref)
 (redef get-collection proto/get-collection)

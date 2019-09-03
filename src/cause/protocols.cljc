@@ -40,4 +40,8 @@
     "Apply one or many \"changes\" at the current logical time.")
   (get-collection [causal-base] [causal-base ref-or-uuid]
     "Returns the causal collection referenced by the uuid or ref.
-    If no uuid or ref is passed, the root collection will be returned."))
+    If no uuid or ref is passed, the root collection will be returned.")
+  (undo [causal-base]
+    "Undo a transaction by the local site-id.")
+  (redo [causal-base]
+    "Redo a transaction by the local site-id."))
