@@ -17,7 +17,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Schema ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(spec/def ::path (spec/keys :req [::s/uuid ::s/type ::s/node]))
+(spec/def ::path (spec/keys :req [::s/uuid ::s/node]))
 (spec/def ::reverse-path (spec/tuple ::s/id ::s/uuid)) ; Starts with id to make sorting easier
 (spec/def ::history (spec/coll-of ::reverse-path ::gen-max 3)) ; Sorted log of all insertions
 (spec/def ::first-undo-lamport-ts ::s/lamport-ts) ; The first lamport-ts on the current undo stack, redo should never go past this
@@ -260,13 +260,12 @@
   "Returns the `[node collection]` for a reverse-path"
   [cb [id uuid]]
   (let [collection (get-collection- cb uuid)
-        node (into [id] (get-in (.-ct collection) [::s/nodes id]))]
+        node (into [id] (get (proto/get-nodes collection) id))]
     [node collection]))
 
 (defn reverse-path->path [cb [id uuid]]
   (let [[node collection] (expand-reverse-path cb [id uuid])]
     {::s/uuid uuid
-     ::s/type (::s/type (.-ct collection))
      ::s/node node}))
 
 (defn tx-id-indexes
@@ -312,7 +311,7 @@
 
 (defn invert-path
   "Generates an inverted tx-part given a path"
-  [{:keys [::s/uuid ::s/type] [id cause value] ::s/node}]
+  [{:keys [::s/uuid] [id cause value] ::s/node}]
   (case value
     ::s/hide [uuid cause ::s/h.show]
     ::s/h.hide [uuid cause ::s/h.show]
@@ -439,6 +438,7 @@
     ([this ref-or-uuid] (get-collection- (.-cb this) ref-or-uuid)))
   (undo [this] (CausalBase. (undo- (.-cb this))))
   (redo [this] (CausalBase. (redo- (.-cb this))))
+  (set-site-id [this site-id] (CausalBase. (assoc (.-cb this) ::s/site-id site-id)))
 
   proto/CausalMeta
   (get-uuid [this] (::s/uuid (.-cb this)))

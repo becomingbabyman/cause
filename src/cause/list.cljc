@@ -155,6 +155,7 @@
 
   proto/CausalTree
   (get-weave [this] (::s/weave (.-ct this)))
+  (get-nodes [this] (::s/nodes (.-ct this)))
   (insert
     ([this node]
      (CausalList. (s/insert weave (.-ct this) node)))

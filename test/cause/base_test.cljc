@@ -208,6 +208,17 @@
     (swap! cb b/redo-)
     (is (= 3 (peek (first (b/get-collection- @cb)))))))
 
+(deftest test-set-site-id
+  (-> (c/new-causal-base)
+      (c/set-site-id "my-site-id")
+      (c/transact [[nil nil [1]]])
+      (c/get-collection)
+      (seq)
+      (ffirst)
+      (second)
+      (= "my-site-id")
+      (is)))
+
 (comment
   (do
     (test-cb->edn)
@@ -223,4 +234,5 @@
     (test-invert-path)
     (test-invert-)
     (test-get-next-tx-id)
-    (test-undo-and-redo-)))
+    (test-undo-and-redo-)
+    (test-set-site-id)))

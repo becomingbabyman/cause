@@ -24,6 +24,7 @@
 (redef ref? c.base/ref?)
 (redef uuid->ref c.base/uuid->ref)
 (redef get-collection proto/get-collection)
+(redef set-site-id proto/set-site-id)
 
 ;;;;;;;;;;;; Other Stuff ;;;;;;;;;;;;
 
@@ -45,6 +46,7 @@
 (redef weft proto/weft)
 (redef causal-merge proto/causal-merge)
 (redef get-weave proto/get-weave)
+(redef get-nodes proto/get-nodes)
 
 ; Causal conversion
 (redef causal->edn s/causal->edn)

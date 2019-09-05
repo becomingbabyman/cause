@@ -13,7 +13,8 @@
   "The CvRDT related functions that a causal tree type must implement."
   (get-weave [causal]
     "The woven cache of nodes.")
-  ; (get-nodes [causal])
+  (get-nodes [causal]
+    "A map of nodes in the form of {id [cause value]}")
   ; (get-yarns [causal])
   ; (get-ct [causal])
   (insert [causal node] [causal node more-nodes-in-tx]
@@ -36,7 +37,7 @@
     `:deref-atoms false`"))
 
 (defprotocol CausalBase
-  (transact [causal-base txs]
+  (transact [causal-base tx]
     "Apply one or many \"changes\" at the current logical time.")
   (get-collection [causal-base] [causal-base ref-or-uuid]
     "Returns the causal collection referenced by the uuid or ref.
@@ -44,4 +45,6 @@
   (undo [causal-base]
     "Undo a transaction by the local site-id.")
   (redo [causal-base]
-    "Redo a transaction by the local site-id."))
+    "Redo a transaction by the local site-id.")
+  (set-site-id [causal-base site-id]
+    "Sets the local site-id."))
