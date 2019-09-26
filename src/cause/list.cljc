@@ -18,60 +18,21 @@
    ::s/yarns {(second (first s/root-node)) [s/root-node]}
    ::s/weave [s/root-node]})
 
-(defn weave-asap?
-  "Takes a left, a middle and a right node. Returns true if the middle
-  node should be inserted as soon as possible."
-  [nl nm nr]
-  (or
-   (= (first nl) (second nm)) ; Always try to weave a node after its cause.
-   (= (first nm) (second nr)))) ; Always try to weave a node before a node it causes.
-
-(defn weave-later?
-  "Takes a left, a middle and a right node. Returns true if the middle
-  node cannot be inserted between the left and the right for any reason.
-  This assumes that you already want to weave-asap?."
-  [nl nm nr seen]
-  (or
-   (and
-    (s/special-keywords (peek nr)) ; if the next node is a hide or a show
-    (not= (first nm) (second nr)) ; and it does not hide or show this node
-    (or (not (s/special-keywords (peek nm))) ; and this node is not also a hide or a show
-        (<< (first nm) (first nr)))) ; or if it is, but it is older, don't weave.
-   (and
-    (or (= (first nl) (second nr)) ; if the next node is caused by the previous node
-        (= (second nl) (second nr)) ; or if the next node shares a cause with the previous node
-        (get seen (second nr))) ; or the next node is caused by a seen node
-    (<< (first nm) (first nr)) ; and this node is older
-    (or (not (s/special-keywords (peek nm))) ; and this node is not a hide or a show
-        (s/special-keywords (peek nr)))) ; or the next node is a hide or a show, don't weave.
-   (and
-    (<< (first nm) (first nr)) ; if this node is older than the next
-    (or (not (s/special-keywords (peek nm))) ; and this node is not a hide or a show
-        (s/special-keywords (peek nr)))))) ; or the next node is a hide or a show, don't weave.
-
 (defn weave
   "Returns a causal tree with its nodes ordered into a weave O(n^2).
-  If a node is passed only that node will be woven in O(n)."
+  If a node is passed only that node will be woven in O(n). If
+  more nodes are passed after the initial node they will be
+  woven in immediately after `node`, keeping the complexity at O(n)
+  when weaving in transactions of node sequences."
   ([causal-tree]
    (reduce weave (assoc causal-tree ::s/weave [])
            (map s/new-node (sort (::s/nodes causal-tree)))))
-  ([causal-tree node]
+  ([causal-tree node] (weave causal-tree node nil))
+  ([causal-tree node more-consecutive-nodes-in-same-tx]
    (if (not (get-in causal-tree [::s/nodes (first node)]))
      causal-tree
-     (loop [left []
-            right (::s/weave causal-tree)
-            prev-asap false
-            seen-since-asap {}]
-       (let [nl (peek left)
-             nr (first right)
-             asap (or prev-asap (weave-asap? nl node nr))]
-         (if (or (empty? right)
-                 (and asap (not (weave-later? nl node nr seen-since-asap))))
-           (assoc causal-tree ::s/weave (into left cat [[node] right]))
-           (recur (conj left nr) (rest right) asap (if asap
-                                                     (assoc seen-since-asap
-                                                            (first nl) true)
-                                                     seen-since-asap))))))))
+     (->> (s/weave-node (::s/weave causal-tree) node more-consecutive-nodes-in-same-tx)
+          (assoc causal-tree ::s/weave)))))
 
 (defn conj-
   ([causal-tree v & vs]
@@ -89,7 +50,8 @@
   "Is this node hidden when the weave is rendered"
   [node next-node-in-weave]
   (or (s/special-keywords (peek node))
-      (and (= ::s/hide (peek next-node-in-weave))
+      (and (or (= ::s/hide (peek next-node-in-weave))
+               (= ::s/h.hide (peek next-node-in-weave)))
            (= (first node) (second next-node-in-weave)))
       (= s/root-node node)))
 
@@ -154,8 +116,9 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
-                                                     :ct (.-ct o)}))))
+        (-write writer (str "#causal/list " (pr-str (s/causal->edn o)))))
+        ; (-write writer (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
+        ;                                              :ct (.-ct o)}))))
 
       IHash
       (-hash [this] (-hash (.-ct this)))
@@ -173,8 +136,9 @@
       (-with-meta [this meta] (CausalList. (-with-meta (.-ct this) meta)))))
 
 #? (:clj (defmethod print-method CausalList [^CausalList o ^java.io.Writer w]
-           (.write w (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
-                                                   :ct (.ct o)})))))
+           (.write w (str "#causal/list " (pr-str (s/causal->edn o))))))
+           ; (.write w (str "#causal/list " (pr-str {:causal->edn (s/causal->edn o)
+           ;                                         :ct (.ct o)})))))
 
 (defn read-edn-map
   [read-object]
@@ -184,13 +148,19 @@
 #? (:cljs (cljs.reader/register-tag-parser! 'causal/list read-edn-map))
 
 (extend-type CausalList
-  proto/CausalTree
+  proto/CausalMeta
   (get-uuid [this] (::s/uuid (.-ct this)))
   (get-ts [this] (::s/lamport-ts (.-ct this)))
   (get-site-id [this] (::s/site-id (.-ct this)))
+
+  proto/CausalTree
   (get-weave [this] (::s/weave (.-ct this)))
-  (insert [this node]
-    (CausalList. (s/insert weave (.-ct this) node)))
+  (get-nodes [this] (::s/nodes (.-ct this)))
+  (insert
+    ([this node]
+     (CausalList. (s/insert weave (.-ct this) node)))
+    ([this node more-nodes]
+     (CausalList. (s/insert weave (.-ct this) node more-nodes))))
   (append [this cause value]
     (CausalList. (s/append weave (.-ct this) cause value)))
   (weft [this ids-to-cut-yarns]
@@ -199,8 +169,9 @@
     (CausalList. (s/merge-trees weave (.-ct causal-list1) (.-ct causal-list2))))
 
   proto/CausalTo
-  (causal->edn [causal opts]
-    (causal-list->edn (.-ct causal) opts)))
+  (causal->edn
+    ([this] (proto/causal->edn this {}))
+    ([causal opts] (causal-list->edn (.-ct causal) opts))))
 
 (defn new-causal-list
   "Creates a new causal list containing the items."

@@ -1,6 +1,125 @@
-# Cause [![Build][travis-image]][travis-url]
+# Cause [![Build][travis-image]][travis-url] ![Licensed under MIT](https://img.shields.io/badge/license-MIT-blue.svg) <a href='http://www.recurse.com' title='Made with love at the Recurse Center'><img src='https://cloud.githubusercontent.com/assets/2883345/11325206/336ea5f4-9150-11e5-9e90-d86ad31993d8.png' height='20px'/></a>
 
-> An EDN-like CRDT (Causal Tree) for Clojure(Script) that automatically tracks history and resolves conflicts. This implementation takes a lot of cues from [Data Laced with History](http://archagon.net/blog/2018/03/24/data-laced-with-history/) and many papers on the topic of CRDTs.
+> An EDN-like CRDT (Causal Tree) for Clojure(Script) that automatically tracks history and resolves conflicts.
+
+Cause is like git for collaborative applications. It is designed to look and feel like regular EDN data (`maps`, `lists`), while also exposing the richness of the append only CvRDTs. Cause handles common collaboration problems like deterministically synchronizing complex data structures across devices, and tracking history. Rather than rely on a central authority, conflicts can be resolved on every client. This makes Cause well suited for decentralized p2p applications.
+
+The implementation takes a lot of cues from [Data Laced with History](http://archagon.net/blog/2018/03/24/data-laced-with-history/) and [prior art](#inspiration-reference--prior-art) related to CRDTs.
+
+## Why?
+
+Why create Cause? Why another CRDT?
+
+Before starting Cause I was working on [a rich text editor](https://github.com/smothers/slate-eunoia) in [Slate](https://github.com/ianstormtaylor/slate). I wanted online/offline sync, collaboration, granular version control, zero dependency on a centralized server, and all of this in one persistent data structure that's easy to render, edit and save to a database. Projects like [Automerge](https://github.com/automerge/automerge) and [Schism](https://github.com/aredington/schism) offered compelling solutions, but fell short on one or more of the properties I was looking for.
+
+## Properties
+
+This is what Cause strives to do:
+
+1. **One data structure for everything.** In Cause this is the `node`. Nodes are just triples of `[id cause value]`. They store identity and causality, and can easily be sent between clients, written to a database and rendered. Multiple in-memory caches make the read and write performance of common node operations fast. And those caches can be reconstituted from a bag of related nodes at runtime, so at rest storage is reduced.
+
+2. **Persist all the data.** Clojure's immutable data structures and immutable data in general is great! It's hard to call Cause immutable since it is designed to be used in distributed eventually consistent systems. Nodes will inevitably arrive in different orders and clients will often have different sets of nodes. What can be guaranteed is that no node is deleted. Cause is append only, with deletions being represented by adding tombstones that hide nodes instead of actually excising the original data. This is similar to [Datomic](https://www.datomic.com/) and makes infinite undo and change tracking possible.
+
+3. **Simple conflict resolution.** The functions that determine the current state of a causal collection should be easy to reason about. This makes them easier to develop correctly and easier to work with intuitively since they have very few corner cases. Most of this work happens in about 50 LOC with the `cause.shared/weave-node` function and the two predicates that power it.
+
+4. **Idiomatic EDN.** The higher level causal data structures that are built from `nodes` implement many of the same protocols as their EDN counterparts. Most Clojure functions should just work on CausalLists and CausalMaps the same way they'd work on lists and maps.
+
+5. **Extended EDN.** Causal collections have some properties that don't fit into existing Clojure collection protocols, specifically identity and history that can span multiple interrelated collections. These database-like properties can efficiently and easily be managed with a CausalBase.
+
+## How it Works
+
+- Causal collections (lists, maps) are made of nodes
+  - `node` - a triplet made of `[id cause value]`
+    - `id` - an easily sortable triplet of `[lamport-ts site-id tx-index]`
+      - `lamport-ts` - a logical clock incremented on every transaction. A natural int counter starting at `0`.
+      - `site-id` - a random uid that represents a location (your computer, my computer)
+      - `tx-index` - the order within a transaction. A natural int counter that is reset to `0` at the start of every transaction.
+        - A transaction is when both `lamport-ts` and `site-id` are the same for multiple nodes. Then `tx-index` serves as the tie breaker
+      - sorting ids
+        - first on logical time `lamport-ts`
+        - if multiple times collide they are sorted on location `site-id`
+        - if multiple nodes are inserted at the same time on the same machine that's a transaction and `tx-index` is used keep them unique and ordered
+    - `cause` - the identifier that "caused" a node
+      - in a list `cause` is the `id` of the preceding node, creating a linked list
+      - in a map `cause` can be a `key` or an `id` (it's normally a `key`, but tombstone operations like undo might be caused by a more granular `id`)
+    - `value` is whatever you set it to, a string, a keyword, another causal collection
+      - since causal collections are append only, if you want to delete (hide) a value you must insert a `cause.core/hide` value. This is non destructive and enables synchronization and time travel.
+
+Nodes are all you need. From a bag of nodes we can consistently weave (build an ordered cache of) them every time. Nodes are also unique so we can deduplicate them across a chatty network. And they include complete history information: time = `lamport-ts`, who = `site-id`, transaction = `lamport-ts` & `site-id`, tx order = `tx-index`. They do not include wall clock time, but they do have everything needed for infinite undo / redo as well as version control and blame tracking.
+
+Cause trades a linear increase in spacial complexity (where n is the set of all additions and subtractions) for all the properties above. Lists are the most complicated to keep sorted and suffer from a linearly increasing time complexity on both reads and writes. Fortunately transacting contiguous sequences is O(n + m) and not O(n * m), so operations like pasting a large sequence stay linear.
+
+### Examples
+
+```clojure
+(ns example
+  (:require [cause.core :as cause]))
+
+; A causal-base. This is the highest level abstraction and what most people will want.
+(def cb (atom (cause/new-causal-base))) ; like a database, but for nested causal collections
+(swap! cb cause/transact [[nil nil {:a 1 :b [2 3]}]]) ; inserts a root map collection with a nested list under the :b key
+(def root-collection-uuid (cause/get-uuid (cause/get-collection @cb))) ; get the root collection with the single arity form of cause/get-collection
+(swap! cb cause/transact [[root-collection-uuid :c 4] ; "assoc" :c 4
+                          [root-collection-uuid :a cause/hide]]) ; "dissoc" :a
+                          ; Transactions are atomic so the addition of :c 4 and the removal of :a will happen at the same time
+(cause/causal->edn @cb) ; {:b (2 3) :c 4}
+(seq (cause/get-collection @cb)) ; ([[2 "BIW6uN8ONfCyf" 0] :c 4] -- the nodes that make up the root map
+                                 ;  [[1 "BIW6uN8ONfCyf" 3] :b :cause.base.ref/eA0tTyXym77oPL0Lf4X6P])
+(seq (cause/get-collection @cb (:b (cause/get-collection @cb))))) ; ([[1 "BIW6uN8ONfCyf" 1] [0 "0" 0] 2] -- the nodes that make up the list under the :b key
+                                                                  ;  [[1 "BIW6uN8ONfCyf" 2] [1 "BIW6uN8ONfCyf" 1] 3])
+; TODO: add more examples
+; undo
+; redo
+; transact into specific points in a list
+
+; An ordered list
+(def cl (atom (cause/new-causal-list :a :b :c)))
+
+(first @cl) ; [[1 "a-site-id" 0] [0 "0" 0] :a] -- [0 "0" 0] is the id of the root-node that every causal-list starts with
+(second @cl) ; [[2 "a-site-id" 0] [1 "a-site-id" 0] :b] -- :b is "caused" by :a
+(last @cl) ; [[3 "a-site-id" 0] [2 "a-site-id" 0] :c] -- :c is "caused" by :b
+
+(swap! cm conj :d) ; :d will be inserted at the end, after :c
+(cause/causal->edn @cl) ; (:a :b :c :d)
+
+(ffirst @cl) ; [1 "a-site-id" 0] -- the ID of the first active element, in this case :a
+(swap! cm cause/append (ffirst @cl) :ab) ; :ab will be inserted between :a and :b since (ffirst @cl) is the ID of :a
+(cause/causal->edn @cl) ; (:a :ab :b :c :d)
+(swap! cm cause/append (ffirst @cl) cause/hide) ; this will hide :a, cause is append only so nothing gets deleted
+(cause/causal->edn @cl) ; (:ab :b :c :d)
+(swap! cm cause/append (ffirst @cl) cause/hide) ; this will hide :ab
+(cause/causal->edn @cl) ; (:b :c :d)
+
+; seq and any function derived from Seqable (aka most functions implemented by CausalLists and CausalMaps) return nodes, not just values.
+; This conveniently exposes id and cause metadata so you always have access to it.
+(seq @cl) ; ([[2 "a-site-id" 0] [1 "a-site-id" 0] :b]
+                   ;  [[3 "a-site-id" 0] [2 "a-site-id" 0] :c]
+                   ;  [[4 "a-site-id" 0] [3 "a-site-id" 0] :d])
+
+; Despite being append only and nodes only ever being hidden you should
+; expect functions to behave like they're only working with the active nodes.
+(count @cl) ; 3                  
+
+
+; A map
+(def cm (atom (cause/new-causal-map :a 1 :b 2)))
+
+; causal-maps are even simpler to work with.
+; For the most part you can just assoc and dissoc and ignore ids.
+(:a @cm) ; 1
+(swap! cm assoc :c 3)
+(get @cm :c) ; 3
+(swap! cm dissoc :b)
+(cause/causal->edn @cm) ; {:a 1 :c 3}
+(seq @cm) ; ([[0 "a-site-id" 0] :a 1] -- exposes the ID of each node
+                  ;  [[2 "a-site-id" 0] :c 3])
+```
+
+## Installation
+
+The API and data structures have no guarantee of stability until 0.1.0 is published ([See Roadmap](#roadmap)).
+
+If you want to try this pre-release code that will likely change you can use [git deps](https://www.clojure.org/news/2018/01/05/git-deps).
 
 ## Development
 
@@ -23,9 +142,6 @@ user=> (cljs) ; to get a cljs repl
 cljs.user=> :cljs/quit ; to go back to clj repl
 ```
 
-[travis-image]: https://img.shields.io/travis/smothers/cause.svg?style=flat-square
-[travis-url]: https://travis-ci.org/smothers/cause
-
 ## Notes
 
 ### Clojure Collection Functions
@@ -36,7 +152,7 @@ On the other hand, `seq` and functions related to seq like `first, last, next, r
 
 **Gotchas:**
 
-- All causal collections act like their EDN equivalent collection around Clojure collection functions. This means they only reveal active values. E.g. if a key is `dissoc`'d from a causal-map you will not be able to `get` it even though it does still exist in the underlying causal data structure.
+- All causal collections act like their EDN equivalent collection around Clojure collection functions. This means they only reveal active values. E.g. if a key is `dissoc`'d from a causal-map you will not be able to `get` it even though it does still exist in the underlying causal data structure and is only hidden with a tombstone.
 
 ### History / Change Tracking / Version Control
 
@@ -77,23 +193,26 @@ Causal collections will automatically track the order values are inserted into t
 - [x] ⏳ Basic merge and weft (time travel) functions. Needs revision.
 - [x] 🗺 Implement `CausalMap`
 - [x] ƛ Implement common Clojure collection protocols in CLJ(S) for CausalList and CausalMap
-- [x] 🏎 Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes. This mostly came from me stupidly using `last` instead of `peek`.
+- [x] 🏎 Do some profiling and improve the performance of the weave function in particular. There is much more tuning to be done, but a doubling of performance was achievable with only minor changes.
 - [x] 🥞 Add transaction support to the data model via `tx-index`
 - [x] ✅ Full test coverage for collection protocol implementations
 - [x] ƛ EDN -> Causal transformation function
-- [ ] 🥞 Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
-  - [ ] Transactions should also weave contiguous sequences in O(n+m) instead of the current O(n*m), where n is all woven nodes and m is nodes in the transaction.
-- [ ] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal tree data type.
-- [ ] ⫷ Nested collection helper functions
-  - [ ] Shared lamport-ts between collections
-  - [ ] Transacting across multiple collections
-  - [ ] History across multiple collections
+- [x] 🥞 Transaction helper functions e.g. a `transact` fn might automatically increment the tx-index when inserting a sequence of values
+  - [x] Transactions should also weave contiguous sequences in O(n+m) instead of the current O(n*m), where n is all woven nodes and m is nodes in the transaction.
+- [x] ⏳ History helper functions e.g. `undo`, `redo`, get `history` for use in a timeline / changelog, `reset` to a point in the history. There is a logical order to all nodes, for performance this will probably want to be stored as an additional vector inside the causal base data type.
+  - [x] Add new history specific special-keywords to distinguish between time travel operations and generic `hide` tombstones
+- [x] ⫷ Nested collection helper functions
+  - [x] Shared lamport-ts between collections
+  - [x] Transacting across multiple collections
+  - [x] History across multiple collections
+  - [x] Share site-ids between nested collections for easier blame tracking
 - [ ] 👋 Improved merge / sync functions. Particularly ways to conveniently sync E2E over a distributed p2p network. Add examples using common packages that support (WebSockets, WebWorkers and WebRTC). Helper functions to make the integration simpler.
   - [ ] Also make some decisions around chattiness and ideal distributed network topologies. Hopefully this can be in the form of a recommended library, but some of the decisions might be specific to distributing a causal tree across many clients
 - [ ] ✅ Generative property based E2E tests with nested collections that share history
   - [ ] Are changes commutative, associative and idempotent regardless of network latency
   - [ ] Can clients recover from errors and potentially request more data if they don't have the nodes they need to perform a merge
   - [ ] Have a way to simulate merge times. E.g. Merging S sites with N nodes each will take T milliseconds in CLJS. This should probably be available directly on the CLI so consumers of this package can easily estimate their loads.
+- [ ] 🧹 Consider replacing positional semantics where reasonable. Ids benefit from being vecs due to sorting, but nodes could probably be maps `{:id :cause :value}`
 - [ ] ♳ Last chance to make major changes to API
 - [ ] 🚀 Publish 0.1.0 as an initial release to Clojars
   - [ ] Make sure tools-deps still works with filesytem and vcs too
@@ -106,3 +225,11 @@ Causal collections will automatically track the order values are inserted into t
 - [ ] 🚀 Publish 1.0.0 with stable API
 - [ ] 🚮 Add garbage collection to weaves. Nodes will never be deleted from the nodes map, but they can be removed from the sorted weave cache when no active nodes depend on them. This will significantly improve read and write performance on causal collections with many hidden nodes. And since the nodes still exist in the nodes map they can always be added back to the weave if a merge from another site comes in that was "caused" by garbage collected nodes.
 - [ ] ⚙️ Research CLJS -> Rust (Wasm) port of internal core insert / weave functions. Are there big enough performance enhancements to offset the added complexity / time. How far along is the Wasm JVM? Can running the JVM in a browser with Cause CLJ provide the desired performance properties?
+- [ ] 🧨 Research mitigating / recovering from, intentionally malicious sites and forged nodes.
+  - [ ] Document attack / corruption vectors. E.g. Inserting non linear lamport-ts. Impersonating other site-ids...
+  - [ ] Add more logging facilities so that in the case of a malicious site other sites can manually rollback and recover to a "correct" state
+  - [ ] See if automatic attack detection / prevention is feasible
+    - [ ] Maybe make it optional in exchange for poorer performance characteristics
+
+[travis-image]: https://img.shields.io/travis/smothers/cause.svg
+[travis-url]: https://travis-ci.org/smothers/cause

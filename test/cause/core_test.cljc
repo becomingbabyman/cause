@@ -2,12 +2,17 @@
   (:require [cause.core :as c]
             [clojure.test :refer [deftest is]]))
 
-(deftest test-edn->causal
-  (let [ct (c/edn->causal
-            [:div
-             [:a {:href "http://npr.org"} "foo"]
-             "bar"])]
-    (is (= :div (last (first ct))))
-    (is (= \r (last (last ct))))
-    (is (= \o (last (last (last (second ct))))))
-    (is (= "http://npr.org" (:href (last (second (last (second ct)))))))))
+(deftest test-core-api
+  (is (= '(:tag {:a 1 :b "together"} \s \p \l \i \t)
+         (c/causal->edn
+          (c/transact
+           (c/new-causal-base)
+           [[nil nil [:tag {:a 1 :b "together"} "split"]]]))))
+  (is (= '(1 2 3)
+         (c/causal->edn
+          (as-> (c/new-causal-base) cb
+                (c/transact cb [[nil nil [2 3]]])
+                (c/transact cb [[(c/get-uuid (c/get-collection cb)) c/root-id 1]]))))))
+
+(comment
+  (test-core-api))
