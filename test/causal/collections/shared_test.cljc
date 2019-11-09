@@ -1,17 +1,11 @@
 (ns causal.collections.shared-test
-  (:require [causal.util :as u]
-            [causal.collections.shared :as s]
-            [causal.core :as c]
-            [clojure.string :as string]
+  (:require [causal.collections.shared :as s]
             [clojure.test :refer [deftest is]]
-            [clojure.spec.alpha :as spec]
-            [clojure.spec.gen.alpha :as gen]
             [clojure.spec.test.alpha :as stest]))
 
-(def ret-key #? (:clj
-                 :clojure.spec.test.check/ret
-                 :cljs
-                 :clojure.test.check/ret))
+(def ret-key
+  #? (:clj :clojure.spec.test.check/ret)
+  #? (:cljs :clojure.test.check/ret))
 
 (deftest spec-fdefs-pass
   (is (get-in (first (stest/check `s/new-node)) [ret-key :pass?])))

@@ -12,7 +12,8 @@
 
             :plugins [[lein-doo "0.1.10"]
                       [lein-cljsbuild "1.1.7" :exclusions [[org.clojure/clojure]]]
-                      [lein-figwheel "0.5.17"]]
+                      [lein-figwheel "0.5.17"]
+                      [metosin/bat-test "0.4.4"]]
 
             :profiles
             {:dev
@@ -32,6 +33,9 @@
               :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}}}
 
             :doo {:alias {:browsers [:electron :chrome :firefox]}}
+
+            :bat-test {:fail-fast? true
+                       :notify-command ["terminal-notifier" "-title" "Cause tests" "-message"]}
 
             :aliases {"deploy" ["do" "clean," "deploy" "clojars"]
                       "test" ["do" ["clean"] ["test"]]

@@ -3,8 +3,8 @@
             [causal.core :as c]
             [causal.collections.list :as c.list]
             [clojure.string :as string]
-            [clojure.test :refer [deftest is]]
-            #? (:clj [criterium.core :refer [quick-bench]])))
+            [clojure.test :refer [deftest is]])
+  #? (:clj (:require [criterium.core :as criterium])))
 
 (def simple-values
   (concat [c/hide c/hide :causal/h.hide :causal/h.hide :s/h.show :s/h.show \ , \ , \ , \ , \newline] (map char (take 26 (iterate inc 97)))))
@@ -177,12 +177,12 @@ respecting it." #" "))
   ; last next rest map seq hash
   ; TODO: str get get-in nth mapv reduce reduce-kv update update-in cons
   (is (empty? (c/list)))
-  (is (not (empty? (c/list :foo "bar"))))
+  (is (seq (c/list :foo "bar")))
   (is (empty? (-> (c/list :foo) (conj c/hide))))
   (let [ct (c/list :foo)
         n (first ct)]
-    (is (not (empty? (-> (c/append ct (first n) c/hide)
-                         (c/append (first n) :causal/h.show))))))
+    (is (seq (-> (c/append ct (first n) c/hide)
+                 (c/append (first n) :causal/h.show)))))
   (is (= 0 (count (c/list))))
   (is (= 1 (count (c/list :foo))))
   (is (= 0 (count (-> (c/list :foo) (conj c/hide)))))
@@ -218,8 +218,8 @@ respecting it." #" "))
 
   (def cl (atom (c/list)))
   (time (do (doall (repeatedly 200 #(swap! cl insert-rand-node))) nil))
-  (quick-bench (do (insert-rand-node @cl) nil))
-  (quick-bench (do (c/causal->edn @cl) nil))
+  (criterium/quick-bench (do (insert-rand-node @cl) nil))
+  (criterium/quick-bench (do (c/causal->edn @cl) nil))
 
   (def cl2 (atom (c/list)))
   (time (do (doall (repeatedly 5 #(swap! cl2 insert-rand-node))) nil))

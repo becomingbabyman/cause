@@ -1,9 +1,10 @@
 (ns causal.collections.list
-  (:require [causal.util :as u :refer [<<]]
+  (:require [causal.util :as u]
             [causal.collections.shared :as s]
-            [causal.protocols :as proto]
-            #? (:cljs [cljs.reader]))
-  #? (:clj
+            [causal.protocols :as proto])
+  #? (:cljs
+      (:require [cljs.reader])
+      :clj
       (:import (clojure.lang IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
                (java.io Writer)
                (java.util Date Collection)
@@ -99,8 +100,8 @@
       (withMeta [this meta] (CausalList. (with-meta ^IObj (.ct this) meta)))
 
       IMeta
-      (meta [this] (.meta ^IMeta (.ct this))))
-    :cljs
+      (meta [this] (.meta ^IMeta (.ct this)))))
+#? (:cljs
     (deftype CausalList [ct]
       ICounted
       (-count [this] (-count (vec (s/causal->edn this {:deref-atoms false}))))
@@ -197,7 +198,6 @@
   (deref ct)
   (cons "wat" @ct)
   (get @ct 0)
-  (type->str (type @ct))
   (str (type @ct))
   (instance? causal.collections.list.CausalList @ct)
   (s/causal->edn @ct {:deref-atoms false})

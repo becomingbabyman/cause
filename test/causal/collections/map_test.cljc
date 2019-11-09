@@ -1,7 +1,5 @@
 (ns causal.collections.map-test
   (:require [causal.core :as c]
-            [causal.collections.shared :as s]
-            [clojure.string :as string]
             [clojure.test :refer [deftest testing is]]))
 
 (deftest basic-map-test
@@ -50,9 +48,9 @@
   ; map seq conj hash str
   ; TODO: mapv reduce reduce-kv
   (is (empty? (c/map)))
-  (is (not (empty? (c/map :foo "bar"))))
+  (is (seq (c/map :foo "bar")))
   (is (empty? (-> (c/map :foo "bar") (dissoc :foo))))
-  (is (not (empty? (-> (c/map :foo "bar") (dissoc :foo) (assoc :foo :causal/h.show)))))
+  (is (seq (-> (c/map :foo "bar") (dissoc :foo) (assoc :foo :causal/h.show))))
   (is (= "bar" (:foo (c/map :foo "bar"))))
   (is (= "bar" (get (c/map :foo "bar") :foo)))
   (is (= "bar" (get-in (c/map :foo (c/map :foo "bar")) [:foo :foo])))
