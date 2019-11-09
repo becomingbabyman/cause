@@ -85,9 +85,9 @@
 ;   (transact- (new-cb) [[nil nil ["🤟🏿"]]]))
 
 (deftest test-CausalBase
-  (is (= 0 (count (c/get-collection (c/new-causal-base)))))
-  (is (= nil (seq (c/get-collection (c/new-causal-base)))))
-  (let [cb (c/transact (c/new-causal-base) [[nil nil [1 2 3]]])]
+  (is (= 0 (count (c/get-collection (c/base)))))
+  (is (= nil (seq (c/get-collection (c/base)))))
+  (let [cb (c/transact (c/base) [[nil nil [1 2 3]]])]
     (is (= 3 (count (c/get-collection cb))))
     (is (= [1 2 3] (mapv peek (seq (c/get-collection cb)))))))
 
@@ -209,7 +209,7 @@
     (is (= 3 (peek (first (b/get-collection- @cb)))))))
 
 (deftest test-set-site-id
-  (-> (c/new-causal-base)
+  (-> (c/base)
       (c/set-site-id "my-site-id")
       (c/transact [[nil nil [1]]])
       (c/get-collection)

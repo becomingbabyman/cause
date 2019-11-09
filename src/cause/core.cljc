@@ -1,6 +1,7 @@
 (ns cause.core
   "The core Cause API."
   {:author "Chris Smothers"}
+  (:refer-clojure :exclude [list map merge])
   (:require [cause.shared :as s]
             [cause.util :refer [redef] :refer-macros [redef]]
             [cause.protocols :as proto]
@@ -17,7 +18,7 @@
   root-id s/root-id)
 
 ; Causal base. This is what you want 99% of the time.
-(redef new-causal-base c.base/new-causal-base)
+(redef base c.base/new-causal-base)
 (redef transact proto/transact)
 (redef undo proto/undo)
 (redef redo proto/redo)
@@ -34,17 +35,17 @@
 (redef get-site-id proto/get-site-id)
 
 ; Nodes are the building blocks of causal data types.
-(redef new-node s/new-node)
+(redef node s/new-node)
 
 ; Causal collection types are convergent and EDN-like.
-(redef new-causal-list c.list/new-causal-list)
-(redef new-causal-map c.map/new-causal-map)
+(redef list c.list/new-causal-list)
+(redef map c.map/new-causal-map)
 
 ; Causal collection functions
 (redef insert proto/insert)
 (redef append proto/append)
 (redef weft proto/weft)
-(redef causal-merge proto/causal-merge)
+(redef merge proto/causal-merge)
 (redef get-weave proto/get-weave)
 (redef get-nodes proto/get-nodes)
 
