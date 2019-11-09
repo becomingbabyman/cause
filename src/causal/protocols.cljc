@@ -1,4 +1,4 @@
-(ns cause.protocols)
+(ns causal.protocols)
 
 (defprotocol CausalMeta
   "Convenience access to the meta data in a causal data type."

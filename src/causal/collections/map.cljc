@@ -1,7 +1,7 @@
-(ns cause.map
-  (:require [cause.util :as u :refer [<<]]
-            [cause.shared :as s]
-            [cause.protocols :as proto]
+(ns causal.collections.map
+  (:require [causal.util :as u :refer [<<]]
+            [causal.collections.shared :as s]
+            [causal.protocols :as proto]
             [clojure.spec.alpha :as spec]
             #? (:cljs [cljs.reader]))
   #? (:clj
@@ -49,14 +49,14 @@
   "Returns the active node for a given tuple of a ::s/list-weave.
   Returns ::blank when the value is hidden."
   [k [[root-id _ _] [_ _ first-v] :as weave-for-key]]
-  (if (or (= first-v ::s/hide) (= first-v ::s/h.hide))
+  (if (or (= first-v :causal/hide) (= first-v :causal/h.hide))
     ::blank
     (loop [[[[id c v] [nr-id nr-c nr-v]] & more] (partition 2 1 [nil] (seq weave-for-key))]
       (cond
         (and (nil? id) (empty? more)) ::blank
         (= s/root-id id) (recur more)
         (s/special-keywords v) (recur more)
-        (or (= nr-v ::s/hide) (= nr-v ::s/h.hide)) (recur more)
+        (or (= nr-v :causal/hide) (= nr-v :causal/h.hide)) (recur more)
         :else [id k v]))))
 
 (defn get-
@@ -84,7 +84,7 @@
 (defn dissoc-
   ([causal-tree k]
    (if (get- causal-tree k) ; only hide keys that are already in the tree
-     (s/append weave causal-tree k ::s/hide)
+     (s/append weave causal-tree k :causal/hide)
      causal-tree))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- causal-tree k) ks)))
@@ -300,7 +300,7 @@
   (vals @ct)
   (type->str (type @ct))
   (str (type @ct))
-  (instance? cause.map.CausalMap @ct)
+  (instance? causal.collections.map.CausalMap @ct)
   (s/causal->edn @ct {:deref-atoms false})
   (s/causal->edn @ct)
   (seq @ct)

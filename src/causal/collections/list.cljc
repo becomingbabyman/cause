@@ -1,7 +1,7 @@
-(ns cause.list
-  (:require [cause.util :as u :refer [<<]]
-            [cause.shared :as s]
-            [cause.protocols :as proto]
+(ns causal.collections.list
+  (:require [causal.util :as u :refer [<<]]
+            [causal.collections.shared :as s]
+            [causal.protocols :as proto]
             #? (:cljs [cljs.reader]))
   #? (:clj
       (:import (clojure.lang IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
@@ -50,8 +50,8 @@
   "Is this node hidden when the weave is rendered"
   [node next-node-in-weave]
   (or (s/special-keywords (peek node))
-      (and (or (= ::s/hide (peek next-node-in-weave))
-               (= ::s/h.hide (peek next-node-in-weave)))
+      (and (or (= :causal/hide (peek next-node-in-weave))
+               (= :causal/h.hide (peek next-node-in-weave)))
            (= (first node) (second next-node-in-weave)))
       (= s/root-node node)))
 
@@ -183,7 +183,7 @@
     (def ct (atom (new-causal-list "f" "o" "o")))
     (swap! ct conj " ")
     (swap! ct conj "b" "a" "r")
-    (swap! ct proto/append (first (second @ct)) ::s/hide)
+    (swap! ct proto/append (first (second @ct)) :causal/hide)
     (swap! ct proto/append (ffirst @ct) "g"))
   (seq @ct)
   (count @ct)
@@ -199,7 +199,7 @@
   (get @ct 0)
   (type->str (type @ct))
   (str (type @ct))
-  (instance? cause.list.CausalList @ct)
+  (instance? causal.collections.list.CausalList @ct)
   (s/causal->edn @ct {:deref-atoms false})
   (s/causal->edn @ct)
   (vec @ct)

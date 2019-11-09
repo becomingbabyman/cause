@@ -1,5 +1,5 @@
-(ns cause.core-test
-  (:require [cause.core :as c]
+(ns causal.core-test
+  (:require [causal.core :as c]
             [clojure.test :refer [deftest is]]))
 
 (deftest test-core-api

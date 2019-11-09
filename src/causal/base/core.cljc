@@ -1,15 +1,15 @@
-(ns cause.base
+(ns causal.base.core
   "Like a database, but for nested causal collections."
   (:require [clojure.spec.alpha :as spec]
-            [cause.util :as u :refer [<<]]
-            [cause.shared :as s]
-            [cause.protocols :as proto]
-            [cause.list :as c.list]
-            [cause.map :as c.map]
-            #? (:cljs [cause.list :refer [CausalList]])
-            #? (:cljs [cause.map :refer [CausalMap]]))
-  #? (:clj (:import (cause.list CausalList)
-                    (cause.map CausalMap)
+            [causal.util :as u :refer [<<]]
+            [causal.collections.shared :as s]
+            [causal.protocols :as proto]
+            [causal.collections.list :as c.list]
+            [causal.collections.map :as c.map]
+            #? (:cljs [causal.collections.list :refer [CausalList]])
+            #? (:cljs [causal.collections.map :refer [CausalMap]]))
+  #? (:clj (:import (causal.collections.list CausalList)
+                    (causal.collections.map CausalMap)
                     (clojure.lang Keyword IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
                     (java.io Writer)
                     (java.util Date Collection)
@@ -58,7 +58,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def ref-ns "cause.base.ref")
+(def ref-ns "causal.base.ref")
 
 (defn uuid->ref [uuid]
   (keyword ref-ns uuid))
@@ -313,10 +313,10 @@
   "Generates an inverted tx-part given a path"
   [{:keys [::s/uuid] [id cause value] ::s/node}]
   (case value
-    ::s/hide [uuid cause ::s/h.show]
-    ::s/h.hide [uuid cause ::s/h.show]
-    ::s/h.show [uuid cause ::s/h.hide]
-    [uuid id ::s/h.hide]))
+    :causal/hide [uuid cause :causal/h.show]
+    :causal/h.hide [uuid cause :causal/h.show]
+    :causal/h.show [uuid cause :causal/h.hide]
+    [uuid id :causal/h.hide]))
 
 (defn invert-
   "Returns a causal-base with a slice of its history inverted. Attempts
@@ -428,7 +428,7 @@
   (let [[cb] read-object]
     (CausalBase. cb)))
 
-#? (:cljs (cljs.reader/register-tag-parser! 'cause.list read-edn-map))
+#? (:cljs (cljs.reader/register-tag-parser! 'causal.collections.list read-edn-map))
 
 (extend-type CausalBase
   proto/CausalBase

@@ -1,18 +1,18 @@
-(ns cause.core
+(ns causal.core
   "The core Cause API."
   {:author "Chris Smothers"}
   (:refer-clojure :exclude [list map merge])
-  (:require [cause.shared :as s]
-            [cause.util :refer [redef] :refer-macros [redef]]
-            [cause.protocols :as proto]
-            [cause.list :as c.list]
-            [cause.map :as c.map]
-            [cause.base :as c.base]))
+  (:require [causal.collections.shared :as s]
+            [causal.util :refer [redef] :refer-macros [redef]]
+            [causal.protocols :as proto]
+            [causal.collections.list :as c.list]
+            [causal.collections.map :as c.map]
+            [causal.base.core :as c.base]))
 
 ; Special values have special effects on causal collections.
 ; NOTE: Special values do not compose with one another.
 ;       E.g. applying hide to a hide will not equal show.
-(def ^{:doc "Insert this value to hide a cause."} hide ::s/hide)
+(def ^{:doc "Insert this value to hide a cause."} hide :causal/hide)
 (def ^{:doc "The id of the first node in every causal-list. To insert
              a node at the front, set root-id as the cause."}
   root-id s/root-id)

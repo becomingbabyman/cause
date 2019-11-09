@@ -1,6 +1,6 @@
-(ns cause.shared
-  (:require [cause.util :as u :refer [<<]]
-            [cause.protocols :as proto]
+(ns causal.collections.shared
+  (:require [causal.util :as u :refer [<<]]
+            [causal.protocols :as proto]
             [clojure.spec.alpha :as spec]
             [clojure.spec.gen.alpha :as gen])
   #? (:clj (:import (clojure.lang Atom))))
@@ -18,7 +18,7 @@
 ; Follow up paper (more detailed impl): https://www.dropbox.com/spec/6go311vjfqhgd6f/Deep_hypertext_with_embedded_revision_co.pdf?dl=0
 
 (def types #{::map ::list}) ; ::rope ::counter
-(def special-keywords #{::hide ::h.hide ::h.show}) ; h- prefixes internal history hide/show
+(def special-keywords #{:causal/hide :causal/h.hide :causal/h.show}) ; h- prefixes internal history hide/show
 (def root-id [0 "0" 0])
 (def root-node [root-id nil nil])
 (def ^:const uuid-length 21)

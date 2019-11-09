@@ -1,4 +1,4 @@
-(ns cause.util
+(ns causal.util
   (:require [nano-id.custom :refer [generate]]))
 
 (defn <<

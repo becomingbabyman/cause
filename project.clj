@@ -45,7 +45,7 @@
             {:builds
              [{:id "browser-test"
                :source-paths ["src" "test"]
-               :compiler {:main cause.runner
+               :compiler {:main causal.runner
                           :output-to "target/browser-test/browser-test.js"
                           :output-dir "target/browser-test/out"
                           :optimizations :none
@@ -53,7 +53,7 @@
               {:id "dev"
                :figwheel {:open-urls ["http://localhost:3449"]}
                :source-paths ["src"]
-               :compiler {:main cause.core
+               :compiler {:main causal.core
                           :asset-path "js/out"
                           :output-to "resources/public/js/main.js"
                           :output-dir "resources/public/js/out"
