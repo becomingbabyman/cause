@@ -1,0 +1,3 @@
+{:linters
+ {:unresolved-symbol
+  {:exclude [(causal.core [redef])]}}}

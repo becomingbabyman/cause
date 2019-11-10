@@ -128,6 +128,12 @@ If you want to try this pre-release code that will likely change you can use [gi
 lein test
 ```
 
+or with a watcher
+
+```
+lein bat-test auto
+```
+
 #### Test CLJS
 ```
 npm install

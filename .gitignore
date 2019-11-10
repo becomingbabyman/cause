@@ -8,3 +8,4 @@ node_modules/*
 .rebel_readline_history
 figwheel_server.log
 resources/public/js/*
+.clj-kondo/.cache
