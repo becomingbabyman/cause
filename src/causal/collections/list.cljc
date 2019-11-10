@@ -76,7 +76,7 @@
 #? (:clj
     (deftype CausalList [ct]
       Counted
-      (count [this] (.count (s/causal->edn this {:deref-atoms false})))
+      (count [this] (.count (s/causal->edn this)))
 
       IPersistentCollection
       (cons [this o] (CausalList. (conj- (.ct this) o)))
@@ -104,7 +104,7 @@
 #? (:cljs
     (deftype CausalList [ct]
       ICounted
-      (-count [this] (-count (vec (s/causal->edn this {:deref-atoms false}))))
+      (-count [this] (-count (vec (s/causal->edn this))))
 
       IEmptyableCollection
       (-empty [this] (CausalList. (empty- (.-ct this))))
@@ -200,7 +200,7 @@
   (get @ct 0)
   (str (type @ct))
   (instance? causal.collections.list.CausalList @ct)
-  (s/causal->edn @ct {:deref-atoms false})
+  (s/causal->edn @ct)
   (s/causal->edn @ct)
   (vec @ct)
   (first @ct)

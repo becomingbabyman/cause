@@ -317,22 +317,11 @@
                 ;       Preserve the value types in causal-tree1. E.g. once merged atoms should still be atoms.
                 ; TODO: improve performance.
 
-(declare causal->edn)
-
-(extend-type Atom
-  proto/CausalTo
-  (causal->edn
-    ([this] (proto/causal->edn this {}))
-    ([this opts]
-     (if (:deref-atoms opts)
-       (causal->edn (deref this) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
-       this))))
-
 (defn causal->edn
   "Takes a value. If it's a causal tree it returns the data representing the
   current state of the tree. If it's not a causal tree it just returns the value."
   ([causal]
-   (causal->edn causal {:deref-atoms true})) ; TODO: add option to concat adjacent strings
+   (causal->edn causal {})) ; TODO: add option to concat adjacent strings
   ([causal opts]
    (if (satisfies? proto/CausalTo causal)
      (proto/causal->edn causal opts)

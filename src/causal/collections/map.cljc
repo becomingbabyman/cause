@@ -136,11 +136,11 @@
       (valAt [this k not-found] (or (.valAt this k) not-found))
 
       IMapIterable
-      (keyIterator [this] (.keyIterator ^IMapIterable (s/causal->edn this {:deref-atoms false})))
-      (valIterator [this] (.valIterator ^IMapIterable (s/causal->edn this {:deref-atoms false})))
+      (keyIterator [this] (.keyIterator ^IMapIterable (s/causal->edn this)))
+      (valIterator [this] (.valIterator ^IMapIterable (s/causal->edn this)))
 
       IKVReduce
-      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/causal->edn this {:deref-atoms false}) f init))
+      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/causal->edn this) f init))
 
       IHashEq
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
@@ -182,7 +182,7 @@
       (-dissoc [this k] (CausalMap. (dissoc- (.-ct this) k)))
 
       IKVReduce
-      (-kv-reduce [this f init] (-kv-reduce (s/causal->edn this {:deref-atoms false}) f init))
+      (-kv-reduce [this f init] (-kv-reduce (s/causal->edn this) f init))
 
       IEquiv
       (-equiv [this other] (-equiv (.-ct this) other))
@@ -300,7 +300,7 @@
   (vals @ct)
   (str (type @ct))
   (instance? causal.collections.map.CausalMap @ct)
-  (s/causal->edn @ct {:deref-atoms false})
+  (s/causal->edn @ct)
   (s/causal->edn @ct)
   (seq @ct)
   (first @ct)
