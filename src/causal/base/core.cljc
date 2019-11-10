@@ -60,7 +60,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def ref-ns "causal.base.ref")
+(def ref-ns "causal.collection.ref")
 
 (defn uuid->ref [uuid]
   (keyword ref-ns uuid))
