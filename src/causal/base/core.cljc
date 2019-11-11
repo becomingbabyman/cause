@@ -1,19 +1,20 @@
-(ns cause.base
+(ns causal.base.core
   "Like a database, but for nested causal collections."
   (:require [clojure.spec.alpha :as spec]
-            [cause.util :as u :refer [<<]]
-            [cause.shared :as s]
-            [cause.protocols :as proto]
-            [cause.list :as c.list]
-            [cause.map :as c.map]
-            #? (:cljs [cause.list :refer [CausalList]])
-            #? (:cljs [cause.map :refer [CausalMap]]))
-  #? (:clj (:import (cause.list CausalList)
-                    (cause.map CausalMap)
-                    (clojure.lang Keyword IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
-                    (java.io Writer)
-                    (java.util Date Collection)
-                    (java.lang Object))))
+            [causal.util :as u :refer [<<]]
+            [causal.collections.shared :as s]
+            [causal.protocols :as proto]
+            [causal.collections.list :as c.list]
+            [causal.collections.map :as c.map]
+            #? (:cljs [causal.collections.list :refer [CausalList]])
+            #? (:cljs [causal.collections.map :refer [CausalMap]]))
+  #? (:clj
+      (:import (causal.collections.list CausalList)
+               (causal.collections.map CausalMap)
+               (clojure.lang Keyword IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
+               (java.io Writer)
+               (java.util Date Collection)
+               (java.lang Object))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Schema ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -58,7 +59,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def ref-ns "cause.base.ref")
+(def ref-ns "causal.collection.ref")
 
 (defn uuid->ref [uuid]
   (keyword ref-ns uuid))
@@ -201,12 +202,12 @@
 
 (defn handle-tx-part-potential-root
   "A tx-part without a `uuid` will create a new root collection."
-  [cb [uuid cause value :as tx-part]]
+  [cb [uuid _ value :as tx-part]]
   (if uuid
     [cb uuid]
     (add-collection-of-this-values-type-to-cb cb value :is-root? true)))
 
-(defn validate-tx-part [cb [uuid cause value :as tx-part]]
+(defn validate-tx-part [cb [uuid _ value :as tx-part]]
   (let [causal (get-in cb [::collections uuid])]
     (when (and uuid (not (::root-uuid cb)))
       (throw (ex-info "Please transact a root collection first by setting uuid and cause to nil"
@@ -222,7 +223,7 @@
   "Performs one tx-part in a transaction. `value`s with EDN collections will be converted to causal
   collections. Nested collections will be flattened into the collections map
   and referenced by their uuid."
-  [cb [uuid cause value :as tx-part] tx-index]
+  [cb [_ cause value :as tx-part] tx-index]
   (let [_ (validate-tx-part cb tx-part)
         [cb uuid] (handle-tx-part-potential-root cb tx-part)
         [cb tx-index] (handle-tx-part-value cb [uuid cause value] tx-index)]
@@ -313,10 +314,10 @@
   "Generates an inverted tx-part given a path"
   [{:keys [::s/uuid] [id cause value] ::s/node}]
   (case value
-    ::s/hide [uuid cause ::s/h.show]
-    ::s/h.hide [uuid cause ::s/h.show]
-    ::s/h.show [uuid cause ::s/h.hide]
-    [uuid id ::s/h.hide]))
+    :causal/hide [uuid cause :causal/h.show]
+    :causal/h.hide [uuid cause :causal/h.show]
+    :causal/h.show [uuid cause :causal/h.hide]
+    [uuid id :causal/h.hide]))
 
 (defn invert-
   "Returns a causal-base with a slice of its history inverted. Attempts
@@ -412,9 +413,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; CausalBase ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #? (:clj
-    (deftype CausalBase [cb])
+    (deftype CausalBase [cb]))
 
-    :cljs
+#? (:cljs
     (deftype CausalBase [cb]
       IPrintWithWriter
       (-pr-writer [o writer opts]
@@ -428,7 +429,7 @@
   (let [[cb] read-object]
     (CausalBase. cb)))
 
-#? (:cljs (cljs.reader/register-tag-parser! 'cause.list read-edn-map))
+#? (:cljs (cljs.reader/register-tag-parser! 'causal.collections.list read-edn-map))
 
 (extend-type CausalBase
   proto/CausalBase

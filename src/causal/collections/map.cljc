@@ -1,14 +1,13 @@
-(ns cause.map
-  (:require [cause.util :as u :refer [<<]]
-            [cause.shared :as s]
-            [cause.protocols :as proto]
+(ns causal.collections.map
+  (:require [causal.util :as u]
+            [causal.collections.shared :as s]
+            [causal.protocols :as proto]
             [clojure.spec.alpha :as spec]
             #? (:cljs [cljs.reader]))
-  #? (:clj
-      (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
-               (java.io Writer)
-               (java.util Date Collection)
-               (java.lang Object))))
+  #? (:clj (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
+                    (java.io Writer)
+                    (java.util Date Collection)
+                    (java.lang Object))))
 
 (defn new-causal-tree []
   {::s/type ::s/map
@@ -28,7 +27,7 @@
    (reduce weave (assoc causal-tree ::s/weave {})
            (map s/new-node (sort (::s/nodes causal-tree)))))
   ([causal-tree node] (weave causal-tree node nil))
-  ([causal-tree [id cause v :as node] more-nodes]
+  ([causal-tree [id cause v] more-nodes]
    (let [cause-is-id? (spec/valid? ::s/id cause)
          key (if cause-is-id?
                (first (get-in causal-tree [::s/nodes cause]))
@@ -48,15 +47,15 @@
 (defn active-node
   "Returns the active node for a given tuple of a ::s/list-weave.
   Returns ::blank when the value is hidden."
-  [k [[root-id _ _] [_ _ first-v] :as weave-for-key]]
-  (if (or (= first-v ::s/hide) (= first-v ::s/h.hide))
+  [k [_ [_ _ first-v] :as weave-for-key]]
+  (if (or (= first-v :causal/hide) (= first-v :causal/h.hide))
     ::blank
-    (loop [[[[id c v] [nr-id nr-c nr-v]] & more] (partition 2 1 [nil] (seq weave-for-key))]
+    (loop [[[[id _ v] [_ _ nr-v]] & more] (partition 2 1 [nil] (seq weave-for-key))]
       (cond
         (and (nil? id) (empty? more)) ::blank
         (= s/root-id id) (recur more)
         (s/special-keywords v) (recur more)
-        (or (= nr-v ::s/hide) (= nr-v ::s/h.hide)) (recur more)
+        (or (= nr-v :causal/hide) (= nr-v :causal/h.hide)) (recur more)
         :else [id k v]))))
 
 (defn get-
@@ -84,7 +83,7 @@
 (defn dissoc-
   ([causal-tree k]
    (if (get- causal-tree k) ; only hide keys that are already in the tree
-     (s/append weave causal-tree k ::s/hide)
+     (s/append weave causal-tree k :causal/hide)
      causal-tree))
   ([causal-tree k & ks]
    (apply dissoc- (dissoc- causal-tree k) ks)))
@@ -136,11 +135,11 @@
       (valAt [this k not-found] (or (.valAt this k) not-found))
 
       IMapIterable
-      (keyIterator [this] (.keyIterator ^IMapIterable (s/causal->edn this {:deref-atoms false})))
-      (valIterator [this] (.valIterator ^IMapIterable (s/causal->edn this {:deref-atoms false})))
+      (keyIterator [this] (.keyIterator ^IMapIterable (s/causal->edn this)))
+      (valIterator [this] (.valIterator ^IMapIterable (s/causal->edn this)))
 
       IKVReduce
-      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/causal->edn this {:deref-atoms false}) f init))
+      (kvreduce [this f init] (.kvreduce ^IKVReduce (s/causal->edn this) f init))
 
       IHashEq
       (hasheq [this] (.hasheq ^IHashEq (.ct this)))
@@ -159,8 +158,8 @@
       (withMeta [this meta] (CausalMap. (with-meta ^IObj (.ct this) meta)))
 
       IMeta
-      (meta [this] (.meta ^IMeta (.ct this))))
-    :cljs
+      (meta [this] (.meta ^IMeta (.ct this)))))
+#? (:cljs
     (deftype CausalMap [ct]
       ICounted
       (-count [this] (count- (.-ct this)))
@@ -182,7 +181,7 @@
       (-dissoc [this k] (CausalMap. (dissoc- (.-ct this) k)))
 
       IKVReduce
-      (-kv-reduce [this f init] (-kv-reduce (s/causal->edn this {:deref-atoms false}) f init))
+      (-kv-reduce [this f init] (-kv-reduce (s/causal->edn this) f init))
 
       IEquiv
       (-equiv [this other] (-equiv (.-ct this) other))
@@ -298,10 +297,9 @@
   (get @ct :gloop "glop")
   (keys @ct)
   (vals @ct)
-  (type->str (type @ct))
   (str (type @ct))
-  (instance? cause.map.CausalMap @ct)
-  (s/causal->edn @ct {:deref-atoms false})
+  (instance? causal.collections.map.CausalMap @ct)
+  (s/causal->edn @ct)
   (s/causal->edn @ct)
   (seq @ct)
   (first @ct)

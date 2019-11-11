@@ -1,4 +1,4 @@
-(ns cause.protocols)
+(ns causal.protocols)
 
 (defprotocol CausalMeta
   "Convenience access to the meta data in a causal data type."
@@ -32,9 +32,7 @@
 
 (defprotocol CausalTo
   (causal->edn [causal] [causal opts]
-    "Convert a causal collection into a traditional edn collection.
-    It will automatically deref atom values unless you pass the opt
-    `:deref-atoms false`"))
+    "Convert a causal collection into a traditional edn collection."))
 
 (defprotocol CausalBase
   (transact [causal-base tx]

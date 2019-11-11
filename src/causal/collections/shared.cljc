@@ -1,6 +1,6 @@
-(ns cause.shared
-  (:require [cause.util :as u :refer [<<]]
-            [cause.protocols :as proto]
+(ns causal.collections.shared
+  (:require [causal.util :as u :refer [<<]]
+            [causal.protocols :as proto]
             [clojure.spec.alpha :as spec]
             [clojure.spec.gen.alpha :as gen])
   #? (:clj (:import (clojure.lang Atom))))
@@ -18,7 +18,7 @@
 ; Follow up paper (more detailed impl): https://www.dropbox.com/spec/6go311vjfqhgd6f/Deep_hypertext_with_embedded_revision_co.pdf?dl=0
 
 (def types #{::map ::list}) ; ::rope ::counter
-(def special-keywords #{::hide ::h.hide ::h.show}) ; h- prefixes internal history hide/show
+(def special-keywords #{:causal/hide :causal/h.hide :causal/h.show}) ; h- prefixes internal history hide/show
 (def root-id [0 "0" 0])
 (def root-node [root-id nil nil])
 (def ^:const uuid-length 21)
@@ -317,22 +317,11 @@
                 ;       Preserve the value types in causal-tree1. E.g. once merged atoms should still be atoms.
                 ; TODO: improve performance.
 
-(declare causal->edn)
-
-(extend-type Atom
-  proto/CausalTo
-  (causal->edn
-    ([this] (proto/causal->edn this {}))
-    ([this opts]
-     (if (:deref-atoms opts)
-       (causal->edn (deref this) opts) ; TODO: HANDLE: this could cause infinite recursion if two tress reference each other. Break out out after visiting each atom once, or throw if that happens
-       this))))
-
 (defn causal->edn
   "Takes a value. If it's a causal tree it returns the data representing the
   current state of the tree. If it's not a causal tree it just returns the value."
   ([causal]
-   (causal->edn causal {:deref-atoms true})) ; TODO: add option to concat adjacent strings
+   (causal->edn causal {})) ; TODO: add option to concat adjacent strings
   ([causal opts]
    (if (satisfies? proto/CausalTo causal)
      (proto/causal->edn causal opts)

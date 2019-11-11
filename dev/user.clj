@@ -19,5 +19,5 @@
   (repl-cljs))
 
 (defn t
-  ([] (run-all-tests #"cause.*"))
+  ([] (run-all-tests #"causal.*"))
   ([ns-sym-to-test] (run-tests ns-sym-to-test)))

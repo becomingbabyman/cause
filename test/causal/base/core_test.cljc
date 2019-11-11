@@ -1,7 +1,7 @@
-(ns cause.base-test
-  (:require [cause.core :as c]
-            [cause.base :as b]
-            [cause.shared :as s]
+(ns causal.base.core-test
+  (:require [causal.core :as c]
+            [causal.base.core :as b]
+            [causal.collections.shared :as s]
             [clojure.spec.alpha :as spec]
             [clojure.test :refer [deftest is testing]]))
 
@@ -85,9 +85,9 @@
 ;   (transact- (new-cb) [[nil nil ["🤟🏿"]]]))
 
 (deftest test-CausalBase
-  (is (= 0 (count (c/get-collection (c/new-causal-base)))))
-  (is (= nil (seq (c/get-collection (c/new-causal-base)))))
-  (let [cb (c/transact (c/new-causal-base) [[nil nil [1 2 3]]])]
+  (is (= 0 (count (c/get-collection (c/base)))))
+  (is (= nil (seq (c/get-collection (c/base)))))
+  (let [cb (c/transact (c/base) [[nil nil [1 2 3]]])]
     (is (= 3 (count (c/get-collection cb))))
     (is (= [1 2 3] (mapv peek (seq (c/get-collection cb)))))))
 
@@ -136,7 +136,7 @@
   (is (= 0 (count (b/subhis @cb [5 (::s/site-id @cb)] nil)))))
 
 (deftest test-invert-path
-  (is (= ["yVqwAa8ypPGRC_p3wdKhS" [1 "QeVBlHoQFZSx0" 0] :cause.shared/h.hide]
+  (is (= ["yVqwAa8ypPGRC_p3wdKhS" [1 "QeVBlHoQFZSx0" 0] :causal/h.hide]
          (b/invert-path
           {::s/uuid "yVqwAa8ypPGRC_p3wdKhS"
            ::s/type ::s/map
@@ -147,7 +147,7 @@
   (swap! cb b/transact- [[nil nil {:a 1 :b 2}]])
   (swap! cb b/transact- [[(::b/root-uuid @cb) :a 3]])
   (swap! cb b/transact- [[(::b/root-uuid @cb) :c [1 2 3]]])
-  (swap! cb b/transact- [[(::b/root-uuid @cb) :c ::s/hide]])
+  (swap! cb b/transact- [[(::b/root-uuid @cb) :c :causal/hide]])
   (is (= 3 (:a (b/get-collection- @cb))))
   (is (= 8 (count (::b/history @cb))))
   (swap! cb b/invert- (::b/history @cb))
@@ -209,7 +209,7 @@
     (is (= 3 (peek (first (b/get-collection- @cb)))))))
 
 (deftest test-set-site-id
-  (-> (c/new-causal-base)
+  (-> (c/base)
       (c/set-site-id "my-site-id")
       (c/transact [[nil nil [1]]])
       (c/get-collection)

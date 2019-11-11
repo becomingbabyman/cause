@@ -20,7 +20,7 @@ This is what Cause strives to do:
 
 2. **Persist all the data.** Clojure's immutable data structures and immutable data in general is great! It's hard to call Cause immutable since it is designed to be used in distributed eventually consistent systems. Nodes will inevitably arrive in different orders and clients will often have different sets of nodes. What can be guaranteed is that no node is deleted. Cause is append only, with deletions being represented by adding tombstones that hide nodes instead of actually excising the original data. This is similar to [Datomic](https://www.datomic.com/) and makes infinite undo and change tracking possible.
 
-3. **Simple conflict resolution.** The functions that determine the current state of a causal collection should be easy to reason about. This makes them easier to develop correctly and easier to work with intuitively since they have very few corner cases. Most of this work happens in about 50 LOC with the `cause.shared/weave-node` function and the two predicates that power it.
+3. **Simple conflict resolution.** The functions that determine the current state of a causal collection should be easy to reason about. This makes them easier to develop correctly and easier to work with intuitively since they have very few corner cases. Most of this work happens in about 50 LOC with the `causal.shared/weave-node` function and the two predicates that power it.
 
 4. **Idiomatic EDN.** The higher level causal data structures that are built from `nodes` implement many of the same protocols as their EDN counterparts. Most Clojure functions should just work on CausalLists and CausalMaps the same way they'd work on lists and maps.
 
@@ -43,7 +43,7 @@ This is what Cause strives to do:
       - in a list `cause` is the `id` of the preceding node, creating a linked list
       - in a map `cause` can be a `key` or an `id` (it's normally a `key`, but tombstone operations like undo might be caused by a more granular `id`)
     - `value` is whatever you set it to, a string, a keyword, another causal collection
-      - since causal collections are append only, if you want to delete (hide) a value you must insert a `cause.core/hide` value. This is non destructive and enables synchronization and time travel.
+      - since causal collections are append only, if you want to delete (hide) a value you must insert a `causal.core/hide` value. This is non destructive and enables synchronization and time travel.
 
 Nodes are all you need. From a bag of nodes we can consistently weave (build an ordered cache of) them every time. Nodes are also unique so we can deduplicate them across a chatty network. And they include complete history information: time = `lamport-ts`, who = `site-id`, transaction = `lamport-ts` & `site-id`, tx order = `tx-index`. They do not include wall clock time, but they do have everything needed for infinite undo / redo as well as version control and blame tracking.
 
@@ -53,7 +53,7 @@ Cause trades a linear increase in spacial complexity (where n is the set of all 
 
 ```clojure
 (ns example
-  (:require [cause.core :as cause]))
+  (:require [causal.core :as cause]))
 
 ; A causal-base. This is the highest level abstraction and what most people will want.
 (def cb (atom (cause/new-causal-base))) ; like a database, but for nested causal collections
@@ -64,7 +64,7 @@ Cause trades a linear increase in spacial complexity (where n is the set of all 
                           ; Transactions are atomic so the addition of :c 4 and the removal of :a will happen at the same time
 (cause/causal->edn @cb) ; {:b (2 3) :c 4}
 (seq (cause/get-collection @cb)) ; ([[2 "BIW6uN8ONfCyf" 0] :c 4] -- the nodes that make up the root map
-                                 ;  [[1 "BIW6uN8ONfCyf" 3] :b :cause.base.ref/eA0tTyXym77oPL0Lf4X6P])
+                                 ;  [[1 "BIW6uN8ONfCyf" 3] :b :causal.base.ref/eA0tTyXym77oPL0Lf4X6P])
 (seq (cause/get-collection @cb (:b (cause/get-collection @cb))))) ; ([[1 "BIW6uN8ONfCyf" 1] [0 "0" 0] 2] -- the nodes that make up the list under the :b key
                                                                   ;  [[1 "BIW6uN8ONfCyf" 2] [1 "BIW6uN8ONfCyf" 1] 3])
 ; TODO: add more examples
@@ -126,6 +126,12 @@ If you want to try this pre-release code that will likely change you can use [gi
 #### Test CLJ
 ```
 lein test
+```
+
+or with a watcher
+
+```
+lein bat-test auto
 ```
 
 #### Test CLJS

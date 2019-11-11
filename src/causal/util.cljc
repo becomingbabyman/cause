@@ -1,4 +1,4 @@
-(ns cause.util
+(ns causal.util
   (:require [nano-id.custom :refer [generate]]))
 
 (defn <<
@@ -74,8 +74,8 @@
 
 ; https://lambdaisland.com/blog/2017-06-12-clojure-gotchas-surrogate-pairs
 (defn char-code-at [str pos]
-  #? (:clj (.charAt str pos)
-           :cljs (.charCodeAt str pos)))
+  #? (:clj (.charAt str pos))
+  #? (:cljs (.charCodeAt str pos)))
 ; OPTIMIZE: this breaks on long strings
 ; NOTE: do not use util optimized.
 (defn char-seq
