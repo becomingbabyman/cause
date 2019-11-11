@@ -56,7 +56,7 @@ Cause trades a linear increase in spacial complexity (where n is the set of all 
   (:require [causal.core :as cause]))
 
 ; A causal-base. This is the highest level abstraction and what most people will want.
-(def cb (atom (cause/new-causal-base))) ; like a database, but for nested causal collections
+(def cb (atom (cause/base))) ; like a database, but for nested causal collections
 (swap! cb cause/transact [[nil nil {:a 1 :b [2 3]}]]) ; inserts a root map collection with a nested list under the :b key
 (def root-collection-uuid (cause/get-uuid (cause/get-collection @cb))) ; get the root collection with the single arity form of cause/get-collection
 (swap! cb cause/transact [[root-collection-uuid :c 4] ; "assoc" :c 4
@@ -73,7 +73,7 @@ Cause trades a linear increase in spacial complexity (where n is the set of all 
 ; transact into specific points in a list
 
 ; An ordered list
-(def cl (atom (cause/new-causal-list :a :b :c)))
+(def cl (atom (cause/list :a :b :c)))
 
 (first @cl) ; [[1 "a-site-id" 0] [0 "0" 0] :a] -- [0 "0" 0] is the id of the root-node that every causal-list starts with
 (second @cl) ; [[2 "a-site-id" 0] [1 "a-site-id" 0] :b] -- :b is "caused" by :a
@@ -102,7 +102,7 @@ Cause trades a linear increase in spacial complexity (where n is the set of all 
 
 
 ; A map
-(def cm (atom (cause/new-causal-map :a 1 :b 2)))
+(def cm (atom (cause/map :a 1 :b 2)))
 
 ; causal-maps are even simpler to work with.
 ; For the most part you can just assoc and dissoc and ignore ids.
