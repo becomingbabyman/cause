@@ -49,70 +49,94 @@ Nodes are all you need. From a bag of nodes we can consistently weave (build an 
 
 Cause trades a linear increase in spacial complexity (where n is the set of all additions and subtractions) for all the properties above. Lists are the most complicated to keep sorted and suffer from a linearly increasing time complexity on both reads and writes. Fortunately transacting contiguous sequences is O(n + m) and not O(n * m), so operations like pasting a large sequence stay linear.
 
-### Examples
+## Examples
+
+### CausalBase
+*This is the highest level abstraction and what most people will want.*
 
 ```clojure
 (ns example
   (:require [causal.core :as cause]))
 
-; A causal-base. This is the highest level abstraction and what most people will want.
-(def cb (atom (cause/base))) ; like a database, but for nested causal collections
-(swap! cb cause/transact [[nil nil {:a 1 :b [2 3]}]]) ; inserts a root map collection with a nested list under the :b key
-(def root-collection-uuid (cause/get-uuid (cause/get-collection @cb))) ; get the root collection with the single arity form of cause/get-collection
-(swap! cb cause/transact [[root-collection-uuid :c 4] ; "assoc" :c 4
-                          [root-collection-uuid :a cause/hide]]) ; "dissoc" :a
-                          ; Transactions are atomic so the addition of :c 4 and the removal of :a will happen at the same time
-(cause/causal->edn @cb) ; {:b (2 3) :c 4}
-(seq (cause/get-collection @cb)) ; ([[2 "BIW6uN8ONfCyf" 0] :c 4] -- the nodes that make up the root map
-                                 ;  [[1 "BIW6uN8ONfCyf" 3] :b :causal.base.ref/eA0tTyXym77oPL0Lf4X6P])
-(seq (cause/get-collection @cb (:b (cause/get-collection @cb))))) ; ([[1 "BIW6uN8ONfCyf" 1] [0 "0" 0] 2] -- the nodes that make up the list under the :b key
-                                                                  ;  [[1 "BIW6uN8ONfCyf" 2] [1 "BIW6uN8ONfCyf" 1] 3])
+(def cb (atom (cause/base)))                                            ; like a database, but for nested causal collections
+
+(def starting-data {:a 1 :b [2 3]})
+
+(swap! cb cause/transact [[nil nil starting-data]])                     ; inserts a root map collection with a nested list under the :b key
+
+(def root-collection-uuid (cause/get-uuid (cause/get-collection @cb)))  ; get the root collection with the single arity form of cause/get-collection
+(swap! cb cause/transact [[root-collection-uuid :c 4]                   ; "assoc" :c 4
+                          [root-collection-uuid :a cause/hide]])        ; "dissoc" :a
+                                                                        ; Transactions are atomic so the addition of :c 4 and the removal of :a will happen at the same time
+
+(cause/causal->edn @cb)                                                 ; {:b (2 3) :c 4}
+
+(seq (cause/get-collection @cb))                                        ; ([[2 "BIW6uN8ONfCyf" 0] :c 4] -- the nodes that make up the root map
+                                                                        ;  [[1 "BIW6uN8ONfCyf" 3] :b :causal.base.ref/eA0tTyXym77oPL0Lf4X6P])
+
+(seq (cause/get-collection @cb (:b (cause/get-collection @cb)))))       ; ([[1 "BIW6uN8ONfCyf" 1] [0 "0" 0] 2] -- the nodes that make up the list under the :b key
+                                                                        ;  [[1 "BIW6uN8ONfCyf" 2] [1 "BIW6uN8ONfCyf" 1] 3])
+
 ; TODO: add more examples
 ; undo
 ; redo
+; reset
 ; transact into specific points in a list
+```
 
-; An ordered list
+### CausalList
+
+```clojure
+(ns example
+  (:require [causal.core :as cause]))
+  
+; CausalList
 (def cl (atom (cause/list :a :b :c)))
 
-(first @cl) ; [[1 "a-site-id" 0] [0 "0" 0] :a] -- [0 "0" 0] is the id of the root-node that every causal-list starts with
-(second @cl) ; [[2 "a-site-id" 0] [1 "a-site-id" 0] :b] -- :b is "caused" by :a
-(last @cl) ; [[3 "a-site-id" 0] [2 "a-site-id" 0] :c] -- :c is "caused" by :b
+(first @cl)   ; [[1 "a-site-id" 0] [0 "0" 0] :a] -- [0 "0" 0] is the id of the root-node that every causal-list starts with
+(second @cl)  ; [[2 "a-site-id" 0] [1 "a-site-id" 0] :b] -- :b is "caused" by :a
+(last @cl)    ; [[3 "a-site-id" 0] [2 "a-site-id" 0] :c] -- :c is "caused" by :b
 
-(swap! cm conj :d) ; :d will be inserted at the end, after :c
-(cause/causal->edn @cl) ; (:a :b :c :d)
+(swap! cl conj :d)       ; :d will be inserted at the end, after :c
+(cause/causal->edn @cl)  ; (:a :b :c :d)
 
-(ffirst @cl) ; [1 "a-site-id" 0] -- the ID of the first active element, in this case :a
-(swap! cm cause/append (ffirst @cl) :ab) ; :ab will be inserted between :a and :b since (ffirst @cl) is the ID of :a
-(cause/causal->edn @cl) ; (:a :ab :b :c :d)
-(swap! cm cause/append (ffirst @cl) cause/hide) ; this will hide :a, cause is append only so nothing gets deleted
-(cause/causal->edn @cl) ; (:ab :b :c :d)
-(swap! cm cause/append (ffirst @cl) cause/hide) ; this will hide :ab
-(cause/causal->edn @cl) ; (:b :c :d)
+(ffirst @cl)                                     ; [1 "a-site-id" 0] -- the ID of the first active element, in this case :a
+(swap! cl cause/append (ffirst @cl) :ab)         ; :ab will be inserted between :a and :b since (ffirst @cl) is the ID of :a
+(cause/causal->edn @cl)                          ; (:a :ab :b :c :d)
+(swap! cl cause/append (ffirst @cl) cause/hide)  ; this will hide :a, cause is append only so nothing gets deleted
+(cause/causal->edn @cl)                          ; (:ab :b :c :d)
+(swap! cl cause/append (ffirst @cl) cause/hide)  ; this will hide :ab
+(cause/causal->edn @cl)                          ; (:b :c :d)
 
 ; seq and any function derived from Seqable (aka most functions implemented by CausalLists and CausalMaps) return nodes, not just values.
 ; This conveniently exposes id and cause metadata so you always have access to it.
-(seq @cl) ; ([[2 "a-site-id" 0] [1 "a-site-id" 0] :b]
-                   ;  [[3 "a-site-id" 0] [2 "a-site-id" 0] :c]
-                   ;  [[4 "a-site-id" 0] [3 "a-site-id" 0] :d])
+(seq @cl)  ; ([[2 "a-site-id" 0] [1 "a-site-id" 0] :b]
+           ;  [[3 "a-site-id" 0] [2 "a-site-id" 0] :c]
+           ;  [[4 "a-site-id" 0] [3 "a-site-id" 0] :d])
 
 ; Despite being append only and nodes only ever being hidden you should
 ; expect functions to behave like they're only working with the active nodes.
-(count @cl) ; 3                  
+(count @cl)  ; 3                  
+```
 
+### CausalList
 
-; A map
+```clojure
+(ns example
+  (:require [causal.core :as cause]))
+  
+; CausalMap
 (def cm (atom (cause/map :a 1 :b 2)))
 
 ; causal-maps are even simpler to work with.
 ; For the most part you can just assoc and dissoc and ignore ids.
-(:a @cm) ; 1
+(:a @cm)                 ; 1
 (swap! cm assoc :c 3)
-(get @cm :c) ; 3
+(get @cm :c)             ; 3
 (swap! cm dissoc :b)
-(cause/causal->edn @cm) ; {:a 1 :c 3}
-(seq @cm) ; ([[0 "a-site-id" 0] :a 1] -- exposes the ID of each node
-                  ;  [[2 "a-site-id" 0] :c 3])
+(cause/causal->edn @cm)  ; {:a 1 :c 3}
+(seq @cm)                ; ([[0 "a-site-id" 0] :a 1] -- exposes the ID of each node
+                         ;  [[2 "a-site-id" 0] :c 3])
 ```
 
 ## Installation
