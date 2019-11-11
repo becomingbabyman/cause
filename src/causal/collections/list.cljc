@@ -1,14 +1,12 @@
 (ns causal.collections.list
   (:require [causal.util :as u]
             [causal.collections.shared :as s]
-            [causal.protocols :as proto])
-  #? (:cljs
-      (:require [cljs.reader])
-      :clj
-      (:import (clojure.lang IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
-               (java.io Writer)
-               (java.util Date Collection)
-               (java.lang Object))))
+            [causal.protocols :as proto]
+            #? (:cljs [cljs.reader]))
+  #? (:clj (:import (clojure.lang IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)
+                    (java.io Writer)
+                    (java.util Date Collection)
+                    (java.lang Object))))
 
 (defn new-causal-tree []
   {::s/type ::s/list

@@ -5,11 +5,10 @@
             [causal.collections.shared :as s]
             [causal.protocols :as proto]
             [causal.collections.list :as c.list]
-            [causal.collections.map :as c.map])
-  #? (:cljs
-      (:require [causal.collections.list :refer [CausalList]]
-                [causal.collections.map :refer [CausalMap]])
-      :clj
+            [causal.collections.map :as c.map]
+            #? (:cljs [causal.collections.list :refer [CausalList]])
+            #? (:cljs [causal.collections.map :refer [CausalMap]]))
+  #? (:clj
       (:import (causal.collections.list CausalList)
                (causal.collections.map CausalMap)
                (clojure.lang Keyword IPersistentCollection IPersistentStack IReduce Counted IHashEq Seqable IObj IMeta ISeq)

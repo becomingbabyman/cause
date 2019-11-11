@@ -2,13 +2,12 @@
   (:require [causal.util :as u]
             [causal.collections.shared :as s]
             [causal.protocols :as proto]
-            [clojure.spec.alpha :as spec])
-  #? (:cljs (:require [cljs.reader])
-            :clj
-            (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
-                     (java.io Writer)
-                     (java.util Date Collection)
-                     (java.lang Object))))
+            [clojure.spec.alpha :as spec]
+            #? (:cljs [cljs.reader]))
+  #? (:clj (:import (clojure.lang IPersistentCollection IPersistentMap IHashEq Associative ILookup Counted Seqable IMapIterable IKVReduce IFn IObj IMeta)
+                    (java.io Writer)
+                    (java.util Date Collection)
+                    (java.lang Object))))
 
 (defn new-causal-tree []
   {::s/type ::s/map
