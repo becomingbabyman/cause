@@ -90,7 +90,6 @@ Cause trades a linear increase in spacial complexity (where n is the set of all 
 (ns example
   (:require [causal.core :as cause]))
   
-; CausalList
 (def cl (atom (cause/list :a :b :c)))
 
 (first @cl)   ; [[1 "a-site-id" 0] [0 "0" 0] :a] -- [0 "0" 0] is the id of the root-node that every causal-list starts with
@@ -119,13 +118,12 @@ Cause trades a linear increase in spacial complexity (where n is the set of all 
 (count @cl)  ; 3                  
 ```
 
-### CausalList
+### CausalMap
 
 ```clojure
 (ns example
   (:require [causal.core :as cause]))
   
-; CausalMap
 (def cm (atom (cause/map :a 1 :b 2)))
 
 ; causal-maps are even simpler to work with.
