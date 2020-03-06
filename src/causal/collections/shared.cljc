@@ -40,7 +40,8 @@
 (spec/def ::id (spec/tuple ::lamport-ts ::site-id ::tx-index))
 (spec/def ::tx-id (spec/tuple ::lamport-ts ::site-id)) ; The first 2 values of an ::id make up a uniquely identifiable ::tx-id
 (spec/def ::key (spec/or :k keyword?
-                         :s string?)) ; TODO: EDN supports more key values, but for now these are all that are guaranteed to work in causal-maps
+                         :s string?
+                         :u uuid?)) ; TODO: EDN supports more key values, but for now these are all that are guaranteed to work in causal-maps
 (spec/def ::cause (spec/or :id ::id
                            :key ::key))
 (spec/def ::value (spec/or :special-k special-keywords
