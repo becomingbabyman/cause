@@ -29,8 +29,8 @@
                              [proto-repl "0.3.1"]
                              [figwheel-sidecar "0.5.19"]
                              [com.bhauman/rebel-readline "0.1.4"]
-                             [com.cemerick/piggieback "0.2.2"]]
-              :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}}}
+                             [cider/piggieback "0.4.2"]]
+              :repl-options {:nrepl-middleware [cider.piggieback/wrap-cljs-repl]}}}
 
             :doo {:alias {:browsers [:electron :chrome :firefox]}}
 
