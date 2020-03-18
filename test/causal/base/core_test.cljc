@@ -219,6 +219,13 @@
       (= "my-site-id")
       (is)))
 
+(deftest test-set-uuid
+  (-> (c/base)
+      (c/set-uuid "my-uuid")
+      (c/get-uuid)
+      (= "my-uuid")
+      (is)))
+
 (comment
   (do
     (test-cb->edn)

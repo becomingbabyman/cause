@@ -45,4 +45,6 @@
   (redo [causal-base]
     "Redo a transaction by the local site-id.")
   (set-site-id [causal-base site-id]
-    "Sets the local site-id."))
+    "Sets the local site-id.")
+  (set-uuid [causal-base uuid]
+    "Sets the root UUID."))
