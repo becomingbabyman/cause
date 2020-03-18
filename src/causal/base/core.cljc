@@ -424,11 +424,11 @@
 #? (:clj (defmethod print-method CausalBase [^CausalBase o ^java.io.Writer w]
            (.write w (str "#causal/base " (pr-str (.-cb o))))))
 
-(defn read-edn-map
+(defn read-edn
   [cb]
   (CausalBase. cb))
 
-#? (:cljs (cljs.reader/register-tag-parser! 'causal/base read-edn-map))
+#? (:cljs (cljs.reader/register-tag-parser! 'causal/base read-edn))
 
 (extend-type CausalBase
   proto/CausalBase
