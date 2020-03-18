@@ -192,9 +192,7 @@
 
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#causal/map " (pr-str (s/causal->edn o)))))
-        ; (-write writer (str "#causal/map " (pr-str {:causal->edn (s/causal->edn o)
-        ;                                             :ct (.-ct o)}))))
+        (-write writer (str "#causal/map " (pr-str (.-ct o)))))
 
       IHash
       (-hash [this] (-hash (.-ct this)))
@@ -216,16 +214,13 @@
       (-with-meta [this meta] (CausalMap. (-with-meta (.-ct this) meta)))))
 
 #? (:clj (defmethod print-method CausalMap [^CausalMap o ^java.io.Writer w]
-           (.write w (str "#causal/map " (pr-str (s/causal->edn o))))))
-           ; (.write w (str "#causal/map " (pr-str {:causal->edn (s/causal->edn o)
-           ;                                        :ct (.ct o)})))
+           (.write w (str "#causal/map " (pr-str (.-ct o))))))
 
-(defn read-edn-map
-  [read-object]
-  (let [[ct] read-object]
-    (CausalMap. ct)))
+(defn read-edn
+  [ct]
+  (CausalMap. ct))
 
-#? (:cljs (cljs.reader/register-tag-parser! 'causal/map read-edn-map))
+#? (:cljs (cljs.reader/register-tag-parser! 'causal/map read-edn))
 
 (extend-type CausalMap
   proto/CausalMeta
