@@ -26,6 +26,7 @@
 (redef uuid->ref c.base/uuid->ref)
 (redef get-collection proto/get-collection)
 (redef set-site-id proto/set-site-id)
+(redef set-uuid proto/set-uuid)
 
 ;;;;;;;;;;;; Other Stuff ;;;;;;;;;;;;
 

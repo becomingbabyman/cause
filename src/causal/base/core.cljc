@@ -440,6 +440,7 @@
   (undo [this] (CausalBase. (undo- (.-cb this))))
   (redo [this] (CausalBase. (redo- (.-cb this))))
   (set-site-id [this site-id] (CausalBase. (assoc (.-cb this) ::s/site-id site-id)))
+  (set-uuid [this uuid] (CausalBase. (assoc (.-cb this) ::s/uuid uuid)))
 
   proto/CausalMeta
   (get-uuid [this] (::s/uuid (.-cb this)))
