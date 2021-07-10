@@ -419,17 +419,16 @@
     (deftype CausalBase [cb]
       IPrintWithWriter
       (-pr-writer [o writer opts]
-        (-write writer (str "#causal/base " (pr-str (s/causal->edn o)))))))
+        (-write writer (str "#causal/base " (pr-str cb))))))
 
 #? (:clj (defmethod print-method CausalBase [^CausalBase o ^java.io.Writer w]
-           (.write w (str "#causal/base " (pr-str (s/causal->edn o))))))
+           (.write w (str "#causal/base " (pr-str (.-cb o))))))
 
-(defn read-edn-map
-  [read-object]
-  (let [[cb] read-object]
-    (CausalBase. cb)))
+(defn read-edn
+  [cb]
+  (CausalBase. cb))
 
-#? (:cljs (cljs.reader/register-tag-parser! 'causal.collections.list read-edn-map))
+#? (:cljs (cljs.reader/register-tag-parser! 'causal/base read-edn))
 
 (extend-type CausalBase
   proto/CausalBase
