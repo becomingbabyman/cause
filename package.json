@@ -2,7 +2,7 @@
   "name": "cause",
   "devDependencies": {
     "electron": "^7.2.4",
-    "karma": "^4.4.1",
+    "karma": "^6.4.1",
     "karma-chrome-launcher": "^3.1.0",
     "karma-cljs-test": "^0.1.0",
     "karma-electron-launcher": "^0.2.0",
